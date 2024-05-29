@@ -1,1 +1,3 @@
-"# lista_conductores" 
+# Lista Conductores
+
+Proyecto realizado utilizando  **Node.js** y **Express**.

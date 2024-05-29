@@ -73,16 +73,33 @@ script.
     function confirmarCambios(propios, asociados) {
         let cambios = [];
 
+        console.log("propios:", propios);
+        console.log("asociados:", asociados);
         for (let dataRow of propios) {
-            console.log("orden de arreglo");
             dataRow['delta_ranking'] = calcDeltaRanking(dataRow);
             if (dataRow['delta_ranking'] != 0) {
+                dataRow['orden_original'] = dataRow['orden'];
+
+                let dataRow_2 = propios[dataRow['ranking'] - 1];
+                if (dataRow_2.hasOwnProperty('orden_original')) {
+                    dataRow['orden'] = propios[dataRow['ranking'] - 1]['orden_original'];
+                } else {
+                    dataRow['orden'] = propios[dataRow['ranking'] - 1]['orden'];
+                }
                 cambios.push(dataRow);
             }
         }
         for (let dataRow of asociados) {
             dataRow['delta_ranking'] = calcDeltaRanking(dataRow);
             if (dataRow['delta_ranking'] != 0) {
+                dataRow['orden_original'] = dataRow['orden'];
+
+                let dataRow_2 = asociados[dataRow['ranking'] - 1];
+                if (dataRow_2.hasOwnProperty('orden_original')) {
+                    dataRow['orden'] = asociados[dataRow['ranking'] - 1]['orden_original'];
+                } else {
+                    dataRow['orden'] = asociados[dataRow['ranking'] - 1]['orden'];
+                }
                 cambios.push(dataRow);
             }
         }
@@ -134,11 +151,10 @@ script.
         let row = button.closest("tr");
         let table = button.closest("table");
         let dataTable = table.DataTable();
-        let oldData = dataTable.row(row).data();
-        let removedRanking = oldData.ranking;
-        console.log(removedRanking);
+        let removedData = dataTable.row(row).data();
+        let removedRanking = removedData.ranking;
 
-        let willDelete = oldData.eliminado;
+        let willDelete = removedData.eliminado;
         if (!willDelete) {
             Swal.fire({
                 title: 'Confirmar Eliminación',
@@ -146,16 +162,25 @@ script.
                 showCancelButton: true,
             }).then(result => {
                 if (result.isConfirmed) {
-                    eliminados.push(oldData);
+                    console.log("iniciar proceso de eliminacion");
+                    eliminados.push(removedData);
+                    let ordenBuffer;
+                    let ordenOld = removedData.orden;
                     dataTable.row(row).remove().draw(false);
                     dataTable.rows().every(function(rowIdx, tableLoop, rowLoop) {
-                        var data = this.data();
+                        let data = this.data();
                         if (data.ranking > removedRanking) {
-                            let newOrden;
-                            oldData = data;
+                            ordenBuffer = data.orden;
                             console.log(data);
+                            // ademas del ranking, actualizamos el orden
                             data.ranking = data.ranking - 1;
-                            data.orden = oldData.orden;
+                            data.ranking_original = data.ranking_original - 1;
+                            // guardamos el orden actual en buffer
+                            ordenBuffer = data.orden;
+                            // reemplazamos el orden por el antiguo
+                            data.orden = ordenOld;
+                            // el antiguo ahora es el que estaba en data
+                            ordenOld = ordenBuffer;
                             this.data(data);
                         }
                     });
@@ -166,9 +191,9 @@ script.
         buttonElem.value = willDelete? 'Eliminar' : 'Cancelar';
         button.toggleClass('btn-warning btn-danger');
         row.toggleClass('bg-danger text-white');
-        oldData.eliminado = !willDelete;
+        removedData.eliminado = !willDelete;
         let dataAfter = table.DataTable().row( row ).data();
-        console.log(dataAfter);
+        console.log("data after:", dataAfter);
     }
 
     function toggleEdit(tablaPropios, tablaAsociados) {

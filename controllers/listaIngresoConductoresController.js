@@ -28,7 +28,7 @@ exports.cargarConductores = async (req, res) => {
 exports.agregarConductorEnListaIngreso = async (req, res) => {
     let reqJSON = req.body;
 
-    //TODO: validar RUT
+    //TODO: hacer validaciones server-side
 
     if (reqJSON.hasOwnProperty('porteador')) {
         reqJSON['porteador'] = true;
@@ -78,17 +78,16 @@ exports.guardarCambiosMantenedor = async (req, res) => {
         for (let dataCambio of reordenadosArray) {
             console.log(dataCambio);
             await db.n_virginia.query(`
-                INSERT INTO mantenedor_ingreso_conductores (fk_ingreso, delta_orden, eliminado)
-                    VALUES (:fk_ingreso, :delta_orden, false)
-                    ON CONFLICT (fk_ingreso) 
-                    DO UPDATE SET delta_orden = mantenedor_ingreso_conductores.delta_orden + EXCLUDED.delta_orden;        
+                UPDATE mantenedor_ingreso_conductores
+                    SET orden = :orden
+                    WHERE fk_ingreso = :fk_ingreso;       
             `,
             {
                 replacements: {
                     fk_ingreso: parseInt(dataCambio['id']),
-                    delta_orden: parseInt(dataCambio['delta_ranking']),
+                    orden: parseInt(dataCambio['orden']),
                 },
-                type: QueryTypes.INSERT
+                type: QueryTypes.UPDATE
             });
             console.log('ENVIADO');
         }
@@ -98,29 +97,22 @@ exports.guardarCambiosMantenedor = async (req, res) => {
         for (let dataEliminado of eliminadosArray) {
             console.log(dataEliminado);
             await db.n_virginia.query(`
-                INSERT INTO mantenedor_ingreso_conductores (fk_ingreso, delta_orden, eliminado)
-                    VALUES (:fk_ingreso, 0, :eliminado)
-                    ON CONFLICT (fk_ingreso) 
-                    DO UPDATE SET eliminado = EXCLUDED.eliminado;
+                UPDATE mantenedor_ingreso_conductores
+                    SET eliminado = :eliminado
+                    WHERE fk_ingreso = :fk_ingreso;   
             `,
             {
                 replacements: {
                     fk_ingreso: parseInt(dataEliminado['id']),
                     eliminado: dataEliminado['eliminado'],
                 },
-                type: QueryTypes.INSERT
+                type: QueryTypes.UPDATE
             });
             console.log('ENVIADO');
         }
     }
 
-    /*
-    let Conductores = await db.query(`
-    SELECT usu_rut, UPPER(TRIM(usu_nombre)) || ' ' || UPPER(TRIM(usu_apellido)) AS nombre, ult_empt_tipo AS tipo FROM usuarios WHERE usu_tipo = 2 AND usu_estado = 0;
-    `);
-    */
-
-    // TODO: answer
+    // TODO: response en caso de error
     res.json({ response: 'success' });
 };
 

@@ -53,6 +53,30 @@ script.
         return dataRow['ranking'] - dataRow['ranking_original'];
     }
 
+    function generateConductorSelectOption(conductorData) {
+        let newOption = document.createElement('option');
+
+        newOption.text = conductorData['nombre'];
+        newOption.value = conductorData['usu_rut'];
+        newOption.setAttribute('data-tipo', conductorData['tipo']);
+        $('#conductorSelect').append(newOption);
+    }
+
+    function formatConductores(conductoresData) {
+        let formattedData = {};
+        for (let datosFila of conductoresData) {
+            formattedData[datosFila['nombre']] = {
+                rut: datosFila['usu_rut'],
+                tipo: datosFila['tipo'],
+            }
+            if (datosFila['tipo'] === 'PROPIO') {
+                console.log(datosFila['nombre']);
+            }
+            generateConductorSelectOption(datosFila);
+        }
+        return formattedData;
+    }
+
     /***********************************/
 
     function enviarCambios(reordenados, eliminados) {
@@ -219,61 +243,53 @@ script.
     }
 
     function getConductores() {
-        $.ajax({
-            url: '/conductores',
-            method: 'GET',
-            data: {},
-            success: function(response) {
-                // Si obtenemos response, llenamos el select de conductores
-                for (let datosFila of response) {
-                    let newOption = document.createElement('option');
-
-                    conductoresObj[datosFila['nombre']] = {
-                        rut: datosFila['usu_rut'],
-                        tipo: datosFila['tipo'],
-                    }
-                    if (datosFila['tipo'] === 'PROPIO') {
-                        console.log(datosFila['nombre']);
-                    }
-
-                    newOption.text = datosFila['nombre'];
-                    newOption.value = datosFila['usu_rut'];
-                    newOption.setAttribute('data-tipo', datosFila['tipo']);
-                    $('#conductorSelect').append(newOption);
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/conductores',
+                method: 'GET',
+                data: {},
+                success: function(response) {
+                    let formattedResponse = formatConductores(response);
+                    resolve(formattedResponse);
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error enviando datos:', error);
+                    reject(error);
                 }
-
-                $(function () {
-                    $("#conductorText").autocomplete({
-                        open: function() {
-                            $('.ui-autocomplete').css({
-                                'z-index': 10000,
-                                'font-size': '0.68em',
-                                'min-width': '180px',
-                                'width': 'fit-content',
-                                'max-height': '50vh',
-                                'overflow-y': 'auto',
-                                'overflow-x': 'clip',
-                            });
-                        },
-                        source: Object.keys(conductoresObj),
-                        select: function( event, ui ) {
-                            $("#conductorSelect").val(conductoresObj[ui.item.label].rut);
-                        }
-                    });
-                });
-
-                $('#submit').prop('disabled', false);
-            },
-            error: function(xhr, status, error) {
-                // Handle error
-                console.error('Error submitting form:', error);
-            }
+            });
         });
     }
 
     // document.ready
     $(function() {
-        getConductores();
+        getConductores().then(data => {
+            conductoresObj = data;
+            $(function () {
+                $("#conductorText").autocomplete({
+                    open: function() {
+                        $('.ui-autocomplete').css({
+                            'z-index': 10000,
+                            'font-size': '0.68em',
+                            'min-width': '180px',
+                            'width': 'fit-content',
+                            'max-height': '50vh',
+                            'overflow-y': 'auto',
+                            'overflow-x': 'clip',
+                        });
+                    },
+                    source: Object.keys(conductoresObj),
+                    select: function( event, ui ) {
+                        $("#conductorSelect").val(conductoresObj[ui.item.label].rut);
+                    }
+                });
+            });
+
+            $('#conductorSelect').prop('disabled', false);
+            $('#conductorText').prop('disabled', false);
+            $('#porteador').prop('disabled', false);
+            $('#submit').prop('disabled', false);
+        });
 
         fetchRankings().then(data => {
             let tablaPropios = $('#tablaPropios').DataTable(dataTableConfig);

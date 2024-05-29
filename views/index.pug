@@ -21,11 +21,11 @@ html
                     .form-group
                         label(for='conductor') CONDUCTOR:
                         .input-group
-                            input#conductorText.form-control(type='text' name='conductorText' autocomplete='off' placeholder='INGRESE CONDUCTOR' style="height: 24px; width: 150px; font-size: 0.85em; padding-top: 3px; padding-left: 3px; padding-right: 3px;")
+                            input#conductorText.form-control(type='text' name='conductorText' disabled=true autocomplete='off' placeholder='INGRESE CONDUCTOR' style="height: 24px; width: 150px; font-size: 0.85em; padding-top: 3px; padding-left: 3px; padding-right: 3px;")
                             .input-group-append
-                            select#conductorSelect.form-control(name='conductorSelect' style="height: 24px; font-size: 0.85em; padding: 0px;")
+                            select#conductorSelect.form-control(name='conductorSelect' disabled=true style="height: 24px; font-size: 0.85em; padding: 0px;")
                                 option(value='-1' style="color: grey;") SELECCIONE CONDUCTOR...
-                    input#porteador(type='checkbox' name='porteador')
+                    input#porteador(type='checkbox' disabled=true name='porteador')
                     label.ml-1(for='porteador') PORTEÓ
                     br
                     input#submit.btn.btn-success(type='submit' value='INGRESAR A LISTA' disabled=true style="height: 24px; font-size: 0.85em; padding-top: 3px; min-width: 130px;") 

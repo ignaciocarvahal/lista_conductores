@@ -1,0 +1,112 @@
+script(src='./js/dataTables.rowReorder.min.js')
+script(src='./js/dataTables.buttons.min.js')
+
+script.
+
+    /**** Utils ****/
+
+    function checkboxRender(data, type, row) {
+        let checked = '';
+        if (data == true) {
+            checked = ' checked';
+        }
+        return `
+            <input type="checkbox"${checked}>
+        `;
+    }
+
+    /***************/
+
+    function getConductores() {
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/conductores',
+                method: 'GET',
+                data: {},
+                success: function(response) {
+                    // Si obtenemos response, llenamos el select de conductores
+                    let conductoresArray = [];
+                    for (let datosFila of response) {
+                        let conductorFila = {
+                            nombre: datosFila['nombre'],
+                            tipo: datosFila['tipo'],
+                            'tipo viaje 1': 'STGO',
+                            'tipo viaje 2': 'VALPO',
+                            'disponible mañana': true,
+                            'disponible en 2 dias': true,
+                            'disponible en 3 dias': false,
+                        };
+                        conductoresArray.push(conductorFila);
+                    }
+
+                    $('#submit').prop('disabled', false);
+                    resolve(conductoresArray)
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error submitting form:', error);
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    function fetchRankings() {
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/rankings',
+                method: 'GET',
+                data: {},
+                success: function(response) {
+                    console.log("success:", response);
+                    resolve(formatRankingData(response));
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error fetching ranking:', error);
+                    reject(error);
+                }
+            })
+        })
+    } 
+
+    $(function() {
+
+        let commonConfigMantenedor = {
+            language: dataTable_CL,
+            paging: false,
+            searching: false,
+            ordering: true,
+            info: false,
+            columns: [
+                {data: 'nombre'},
+                {data: 'tipo'},
+                {data: 'tipo viaje 1', render: checkboxRender},
+                {data: 'tipo viaje 2', render: checkboxRender},
+                {data: 'disponible mañana', render: checkboxRender},
+                {data: 'disponible en 2 dias', render: checkboxRender},
+                {data: 'disponible en 3 dias', render: checkboxRender},
+            ],
+            columnDefs: [
+                { orderable: false, targets: 7 },
+                { orderable: true, targets: '_all' },
+                {  
+                    targets: 7,
+                    render: function (data, type, row, meta) {
+                        return `
+                        <button 
+                            class="eliminar btn btn-success btn-sm"
+                            style="height: 20px; padding-top: 1px; font-size: 0.95em;"
+                        >Guardar</button>`;
+                    },
+                }
+            ]
+        }
+
+        let tablaMantenedor = $('#tablaMantenedor').DataTable(commonConfigMantenedor);
+
+        getConductores().then(conductoresArray => {
+            let conductores = conductoresArray;
+            tablaMantenedor.rows.add(conductores).draw();
+        })
+    });

@@ -1,0 +1,27 @@
+doctype html
+html
+    head
+        title Lista de Ingreso Conductores - Mantenedor
+        link(rel='stylesheet', href='./css/bootstrap.min.css')
+        link(rel='stylesheet', href='./css/dataTables.bootstrap4.min.css')
+        link(rel='stylesheet', href='./css/rowReorder.dataTables.min.css')
+    body.mx-2(style='text-align: center;')
+        h6 MANTENEDOR LISTA DE INGRESO CONDUCTORES
+        if error
+            p.error= error
+        div#contenedorTablas.mt-2(style="font-size: 0.7em; display: flex; width: 100%; gap: 20px; align-items: center;")
+            div#contenedorMantenedor(style="display: flex; flex-direction: column; margin-left: auto; margin-right: auto;")
+                h6 CONDUCTORES
+                table#tablaMantenedor.table.table-sm.table-striped.table-bordered
+                    thead
+                        tr
+                            th(scope='col' style='min-width: 180px;') NOMBRE
+                            th(scope='col' style='min-width: 60px;') TIPO
+                            th(scope='col' style='min-width: 80px;') TIPO VIAJE 1
+                            th(scope='col' style='min-width: 80px;') TIPO VIAJE 2
+                            th(scope='col' style='min-width: 80px;') DISPONIBLE MAÑANA
+                            th(scope='col' style='min-width: 80px;') DISPONIBLE EN 2 DIAS
+                            th(scope='col' style='min-width: 80px;') DISPONIBLE EN 3 DIAS
+                    tbody(style='text-align: center;')
+        include ../common-scripts.pug
+        include ./script.pug

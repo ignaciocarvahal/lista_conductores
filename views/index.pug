@@ -1,0 +1,61 @@
+doctype html
+html
+    head
+        title Lista de Ingreso Conductores
+        link(rel='stylesheet', href='./css/bootstrap.min.css')
+        link(rel='stylesheet', href='./css/dataTables.bootstrap4.min.css')
+        link(rel='stylesheet', href='./css/rowReorder.dataTables.min.css')
+        link(rel="stylesheet", href="./css/jquery-ui.css")
+        style(type="text/css").
+            custom-menu {
+                font-size: 0.68em
+            }
+    body.mx-2
+        h5(style='text-align: center;') LISTA DE INGRESO CONDUCTORES
+        if error
+            p.error= error
+        div.card(style='text-align: center; padding-top: 10px; padding-bottom: 10px; margin-left: 20%; margin-right: 20%;')
+            h6 INGRESAR CONDUCTOR
+            form#formularioIngreso(action='/submit', method='post' style='margin-left: auto; margin-right: auto;')
+                div(style="width: 190px; font-size: 0.8em;")
+                    .form-group
+                        label(for='conductor') CONDUCTOR:
+                        .input-group
+                            input#conductorText.form-control(type='text' name='conductorText' autocomplete='off' placeholder='INGRESE CONDUCTOR' style="height: 24px; width: 150px; font-size: 0.85em; padding-top: 3px; padding-left: 3px; padding-right: 3px;")
+                            .input-group-append
+                            select#conductorSelect.form-control(name='conductorSelect' style="height: 24px; font-size: 0.85em; padding: 0px;")
+                                option(value='-1' style="color: grey;") SELECCIONE CONDUCTOR...
+                    input#porteador(type='checkbox' name='porteador')
+                    label.ml-1(for='porteador') PORTEÓ
+                    br
+                    input#submit.btn.btn-success(type='submit' value='INGRESAR A LISTA' disabled=true style="height: 24px; font-size: 0.85em; padding-top: 3px; min-width: 130px;") 
+        div#contenedorTablas.mt-4.ml-auto.mr-auto(style="display: flex; flex-direction: column; width: 100%; gap: 20px; align-items: center;")
+            div#divBotonesEdicion(style="display: flex; gap: 10px;")
+                button#botonEditar.btn.btn-warning(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") EDITAR LISTA
+                button#botonConfirmar.btn.btn-secondary(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") CONFIRMAR CAMBIOS
+            div(style="font-size: 0.7em; text-align: center;")
+                div#contenedorPropios
+                    h6 PROPIOS
+                    table#tablaPropios.table.table-sm.table-striped.table-bordered
+                        thead
+                            tr
+                                th(scope='col' style='min-width: 20px;') ORDEN
+                                th(scope='col' style='min-width: 180px;') CONDUCTOR
+                                th(scope='col' style='min-width: 80px;') TIPO
+                                th(scope='col' style='min-width: 55px;') PORTEÓ
+                                th(scope='col' style='min-width: 120px;') HORA INGRESO
+                        tbody
+
+                div#contenedorAsociados
+                    h6 ASOCIADOS
+                    table#tablaAsociados.table.table-sm.table-striped.table-bordered
+                        thead
+                            tr
+                                th(scope='col' style='min-width: 20px;') ORDEN
+                                th(scope='col' style='min-width: 180px;') CONDUCTOR
+                                th(scope='col' style='min-width: 80px;') TIPO
+                                th(scope='col' style='min-width: 55px;') PORTEÓ
+                                th(scope='col' style='min-width: 120px;') HORA INGRESO
+                        tbody
+        include ./common-scripts.pug
+        include ./script.pug

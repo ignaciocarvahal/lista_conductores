@@ -1,0 +1,319 @@
+script(src='./js/dataTables.rowReorder.min.js')
+script(src='./js/jquery-ui.js')
+
+script.
+
+    /************ Variables ************/
+
+    let dataTableConfig = {
+        language: dataTable_CL,
+        paging: false,
+        rowReorder: {
+            dataSrc: 'ranking'
+        },
+        searching: false,
+        info: false,
+        columns: [
+            {data: 'ranking'},
+            {data: 'conductor'},
+            {data: 'tipo'},
+            {data: 'porteador'},
+            {data: 'hora_ingreso'},
+        ],
+        columnDefs: [
+            { orderable: true, className: 'reorder', targets: 0 },
+            { orderable: false, targets: '_all' },
+            {
+                targets: 4,
+                render: DataTable.render.datetime()
+            },
+            {  
+                targets: 5,
+                render: function (data, type, row, meta) {
+                    return `
+                    <input type="button" 
+                        class="eliminar btn btn-danger btn-sm"
+                        style="height: 20px; padding-top: 1px; font-size: 0.95em;"
+                        value="Eliminar"/>`;
+                },
+                visible: false
+            }
+        ]
+    }
+
+    var eliminados = [];
+    var conductoresObj = {};
+    var canEdit = false;
+
+    /***********************************/
+
+    /************** Utils **************/
+
+    function calcDeltaRanking(dataRow) {
+        return dataRow['ranking'] - dataRow['ranking_original'];
+    }
+
+    /***********************************/
+
+    function enviarCambios(reordenados, eliminados) {
+        $.ajax({
+            url: '/mantenedor/cambios',
+            method: 'POST',
+            data: { reordenados: reordenados, eliminados: eliminados },
+            success: function(response) {
+                // console.log(response);
+            },
+            error: function(xhr, status, error) {
+                // Handle error
+                console.error('Error submitting form:', error);
+            }
+        });
+    }
+
+    function confirmarCambios(propios, asociados) {
+        let cambios = [];
+
+        for (let dataRow of propios) {
+            console.log("orden de arreglo");
+            dataRow['delta_ranking'] = calcDeltaRanking(dataRow);
+            if (dataRow['delta_ranking'] != 0) {
+                cambios.push(dataRow);
+            }
+        }
+        for (let dataRow of asociados) {
+            dataRow['delta_ranking'] = calcDeltaRanking(dataRow);
+            if (dataRow['delta_ranking'] != 0) {
+                cambios.push(dataRow);
+            }
+        }
+        console.log("cambios", cambios);
+        console.log("eliminados", eliminados);
+
+        if (cambios.length == 0 && eliminados.length == 0) {
+            Swal.fire({
+                text: 'No hay cambios que guardar',
+                icon: 'warning'
+            })
+        } else {
+            Swal.fire({
+                title: '¿Estás Seguro?',
+                text: 'Se guardarán tus cambios',
+                icon: 'question',
+                showCancelButton: true,
+                showLoaderOnConfirm: true,
+                preConfirm: async() => {
+                    try {
+                        $('#botonEditar').prop('disabled', true);
+                        $('#botonConfirmar').prop('disabled', true);
+                        enviarCambios(cambios, eliminados);
+                    } catch (error) {
+                        Swal.showValidationMessage(`
+                            Hubo un problema guardando los cambios.
+                        `);
+                    }
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#botonEditar').prop('disabled', false);
+                    $('#botonConfirmar').prop('disabled', false);
+                    toggleEdit($('#tablaPropios').DataTable(), $('#tablaAsociados').DataTable());
+                    Swal.fire({
+                        title: 'Cambios Guardados',
+                        icon: 'success',
+                        text: 'Se han guardado los cambios correctamente.'
+                    });
+                }
+            })
+        }
+    }
+
+    function toggleDelete(buttonElem) {
+        let button = $(buttonElem);
+
+        let row = button.closest("tr");
+        let table = button.closest("table");
+        let dataTable = table.DataTable();
+        let oldData = dataTable.row(row).data();
+        let removedRanking = oldData.ranking;
+        console.log(removedRanking);
+
+        let willDelete = oldData.eliminado;
+        if (!willDelete) {
+            Swal.fire({
+                title: 'Confirmar Eliminación',
+                text: '¿Desea eliminar esta fila?',
+                showCancelButton: true,
+            }).then(result => {
+                if (result.isConfirmed) {
+                    eliminados.push(oldData);
+                    dataTable.row(row).remove().draw(false);
+                    dataTable.rows().every(function(rowIdx, tableLoop, rowLoop) {
+                        var data = this.data();
+                        if (data.ranking > removedRanking) {
+                            let newOrden;
+                            oldData = data;
+                            console.log(data);
+                            data.ranking = data.ranking - 1;
+                            data.orden = oldData.orden;
+                            this.data(data);
+                        }
+                    });
+                    dataTable.draw();
+                }
+            })
+        }
+        buttonElem.value = willDelete? 'Eliminar' : 'Cancelar';
+        button.toggleClass('btn-warning btn-danger');
+        row.toggleClass('bg-danger text-white');
+        oldData.eliminado = !willDelete;
+        let dataAfter = table.DataTable().row( row ).data();
+        console.log(dataAfter);
+    }
+
+    function toggleEdit(tablaPropios, tablaAsociados) {
+        canEdit = !canEdit;
+        let botonEditar = $('#botonEditar');
+        let botonConfirmar = $('#botonConfirmar');
+
+        tablaPropios.column(5).visible(canEdit);
+        tablaAsociados.column(5).visible(canEdit);
+        botonEditar.toggleClass('btn-warning btn-danger');
+        botonConfirmar.toggleClass('btn-secondary btn-success');
+        botonConfirmar.prop('disabled', !canEdit);
+
+        if (canEdit) {
+            botonEditar.text('CANCELAR EDICIÓN');
+            tablaPropios.rowReorder.enable();
+            tablaAsociados.rowReorder.enable();
+        } else {
+            tablaPropios.rowReorder.disable();
+            botonEditar.text('EDITAR LISTA');
+            tablaAsociados.rowReorder.disable();
+        }
+    }
+
+    function getConductores() {
+        $.ajax({
+            url: '/conductores',
+            method: 'GET',
+            data: {},
+            success: function(response) {
+                // Si obtenemos response, llenamos el select de conductores
+                for (let datosFila of response) {
+                    let newOption = document.createElement('option');
+
+                    conductoresObj[datosFila['nombre']] = {
+                        rut: datosFila['usu_rut'],
+                        tipo: datosFila['tipo'],
+                    }
+                    if (datosFila['tipo'] === 'PROPIO') {
+                        console.log(datosFila['nombre']);
+                    }
+
+                    newOption.text = datosFila['nombre'];
+                    newOption.value = datosFila['usu_rut'];
+                    newOption.setAttribute('data-tipo', datosFila['tipo']);
+                    $('#conductorSelect').append(newOption);
+                }
+
+                $(function () {
+                    $("#conductorText").autocomplete({
+                        open: function() {
+                            $('.ui-autocomplete').css({
+                                'z-index': 10000,
+                                'font-size': '0.68em',
+                                'min-width': '180px',
+                                'width': 'fit-content',
+                                'max-height': '50vh',
+                                'overflow-y': 'auto',
+                                'overflow-x': 'clip',
+                            });
+                        },
+                        source: Object.keys(conductoresObj),
+                        select: function( event, ui ) {
+                            $("#conductorSelect").val(conductoresObj[ui.item.label].rut);
+                        }
+                    });
+                });
+
+                $('#submit').prop('disabled', false);
+            },
+            error: function(xhr, status, error) {
+                // Handle error
+                console.error('Error submitting form:', error);
+            }
+        });
+    }
+
+    // document.ready
+    $(function() {
+        getConductores();
+
+        fetchRankings().then(data => {
+            let tablaPropios = $('#tablaPropios').DataTable(dataTableConfig);
+            tablaPropios.rows.add(data.propios).draw();
+            tablaPropios.rowReorder.disable();
+
+            let tablaAsociados = $('#tablaAsociados').DataTable(dataTableConfig);
+            tablaAsociados.rows.add(data.asociados).draw();
+            tablaAsociados.rowReorder.disable();
+
+            $('#tablaPropios tbody ').on('click', '.eliminar', function (event) {
+                toggleDelete(this);
+            });
+    
+            $('#tablaAsociados tbody ').on('click', '.eliminar', function (event) {
+                toggleDelete(this);
+            });
+
+            $('#botonEditar').on('click', function (event) {
+                toggleEdit(tablaPropios, tablaAsociados);
+            });
+
+            $('#botonEditar').prop('disabled', false);
+
+            $('#botonConfirmar').on('click', function (event) {
+                console.log('Confirmado!');
+                confirmarCambios(tablaPropios.data().toArray(), tablaAsociados.data().toArray());
+            });
+        });
+
+        $('#formularioIngreso').on("submit", function(event) {
+            // Prevent the form from submitting in the traditional manner
+            event.preventDefault();
+            $('#submit').prop('disabled', true);
+            
+            var formData = serializeToObject(this);
+            // Add 'data-tipo' information, as serialize() does not include it
+            formData['tipo'] = $('#conductorSelect option:selected').data('tipo');
+            console.log(formData);
+            
+            // Send form data asynchronously using AJAX
+            $.ajax({
+            url: '/conductores/add',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                // Handle successful response
+                console.log('Form submitted successfully:', response);
+                Swal.fire({
+                    text: 'Se han ingresado los datos correctamente.',
+                    icon: 'success'
+                })
+            },
+            error: function(xhr, status, error) {
+                // Handle error
+                console.error('Error submitting form:', error);
+            }
+            });
+            // Regardless of the result, re-enable the submit button
+            $('#submit').prop('disabled', false);
+        });
+
+        $('#conductorSelect').on("change", function() {
+            if ($(this).val() != '-1') {
+                $('#conductorText').val($(this).find('option:selected').text());
+            }
+        });
+    });

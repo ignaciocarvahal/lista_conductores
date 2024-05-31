@@ -16,7 +16,6 @@ script.
         columns: [
             {data: 'ranking'},
             {data: 'conductor'},
-            {data: 'tipo'},
             {data: 'porteador'},
             {data: 'hora_ingreso'},
         ],
@@ -24,11 +23,11 @@ script.
             { orderable: true, className: 'reorder', targets: 0 },
             { orderable: false, targets: '_all' },
             {
-                targets: 4,
+                targets: 3,
                 render: DataTable.render.datetime()
             },
             {  
-                targets: 5,
+                targets: 4,
                 render: function (data, type, row, meta) {
                     return `
                     <input type="button" 
@@ -80,17 +79,21 @@ script.
     /***********************************/
 
     function enviarCambios(reordenados, eliminados) {
-        $.ajax({
-            url: '/mantenedor/cambios',
-            method: 'POST',
-            data: { reordenados: reordenados, eliminados: eliminados },
-            success: function(response) {
-                // console.log(response);
-            },
-            error: function(xhr, status, error) {
-                // Handle error
-                console.error('Error submitting form:', error);
-            }
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/mantenedor/cambios',
+                method: 'POST',
+                data: { reordenados: reordenados, eliminados: eliminados },
+                success: function(response) {
+                    // console.log(response);
+                    resolve(response);
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error submitting form:', error);
+                    reject(error);
+                }
+            });
         });
     }
 
@@ -146,7 +149,8 @@ script.
                     try {
                         $('#botonEditar').prop('disabled', true);
                         $('#botonConfirmar').prop('disabled', true);
-                        enviarCambios(cambios, eliminados);
+                        const response = await enviarCambios(cambios, eliminados);
+                        return response.json();
                     } catch (error) {
                         Swal.showValidationMessage(`
                             Hubo un problema guardando los cambios.
@@ -225,8 +229,8 @@ script.
         let botonEditar = $('#botonEditar');
         let botonConfirmar = $('#botonConfirmar');
 
-        tablaPropios.column(5).visible(canEdit);
-        tablaAsociados.column(5).visible(canEdit);
+        tablaPropios.column(4).visible(canEdit);
+        tablaAsociados.column(4).visible(canEdit);
         botonEditar.toggleClass('btn-warning btn-danger');
         botonConfirmar.toggleClass('btn-secondary btn-success');
         botonConfirmar.prop('disabled', !canEdit);

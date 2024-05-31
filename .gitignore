@@ -2,3 +2,4 @@ config
 public/files
 public/node_modules
 node_modules
+SQL.sql

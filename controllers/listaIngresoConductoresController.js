@@ -53,6 +53,46 @@ exports.agregarConductorEnListaIngreso = async (req, res) => {
     res.json({ test: 'hola' });
 };
 
+exports.cargarPresentacionesRetirosMes = async (req, res) => {
+    let PresentacionesRetiros30Dias = await db.data_warehouse.query(`
+        SELECT
+        "public"."etapa"."codigo" AS "codigo",
+        "Conductor"."nombre" AS "Conductor__nombre",
+        COUNT(*) AS "count"
+        FROM
+        "public"."etapa"
+        LEFT JOIN "public"."conductor" AS "Conductor" ON "public"."etapa"."id_etapa" = "Conductor"."id_conductor"
+        LEFT JOIN "public"."caracteristicas" AS "Caracteristicas" ON "public"."etapa"."id_etapa" = "Caracteristicas"."id_caracteristicas"
+        LEFT JOIN "public"."time" AS "Time" ON "public"."etapa"."id_etapa" = "Time"."id_time"
+        WHERE
+        (
+            ("Conductor"."tipo_conductor" = 'ASOCIADO')
+    
+        )
+        AND (
+            "Time"."etapa_1_fecha" >= CAST((NOW() + INTERVAL '-30 day') AS date)
+        )
+        AND (
+            "Time"."etapa_1_fecha" < CAST((NOW() + INTERVAL '1 day') AS date)
+        )
+        AND (
+            ("public"."etapa"."codigo" = '2')
+            OR ("public"."etapa"."codigo" = '1')
+        )
+        AND (
+            "Time"."etapa_1_fecha" >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+        )
+        GROUP BY
+        "public"."etapa"."codigo",
+        "Conductor"."nombre"
+        ORDER BY
+        "public"."etapa"."codigo" ASC,
+        "Conductor"."nombre" ASC
+    `);
+
+    res.json(PresentacionesRetiros30Dias[0]);
+};
+
 exports.cargarRankings = async (req, res) => {
     console.log("CARGAR LISTA INGRESO CONDUCTORES!");
 

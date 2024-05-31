@@ -10,6 +10,18 @@ html
             custom-menu {
                 font-size: 0.68em
             }
+            td { position: relative; }
+            tr.strikeout td:before {
+                content: " ";
+                position: absolute;
+                top: 50%;
+                left: 0;
+                border-bottom: 1px solid #111;
+                width: 100%;
+            }
+            tr.strikeout td {
+                font-style: italic;
+            }
     body.mx-2
         h5(style='text-align: center;') LISTA DE INGRESO CONDUCTORES
         if error

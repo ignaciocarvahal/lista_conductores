@@ -22,6 +22,10 @@ module.exports = function(){
         listaIngresoConductoresController.cargarRankings
     );
 
+    router.get('/conductores/presentaciones_retiros_mes',
+        listaIngresoConductoresController.cargarPresentacionesRetirosMes
+    );
+
     router.post('/conductores/add',
         listaIngresoConductoresController.agregarConductorEnListaIngreso
     );

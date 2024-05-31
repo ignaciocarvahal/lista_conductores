@@ -10,6 +10,18 @@ html
             custom-menu {
                 font-size: 0.68em
             }
+            td { position: relative; }
+            tr.strikeout td:before {
+                content: " ";
+                position: absolute;
+                top: 50%;
+                left: 0;
+                border-bottom: 1px solid #111;
+                width: 100%;
+            }
+            tr.strikeout td {
+                font-style: italic;
+            }
     body.mx-2
         h5(style='text-align: center;') LISTA DE INGRESO CONDUCTORES
         if error
@@ -29,31 +41,29 @@ html
                     label.ml-1(for='porteador') PORTEÓ
                     br
                     input#submit.btn.btn-success(type='submit' value='INGRESAR A LISTA' disabled=true style="height: 24px; font-size: 0.85em; padding-top: 3px; min-width: 130px;") 
-        div#contenedorTablas.mt-4.ml-auto.mr-auto(style="display: flex; flex-direction: column; width: 100%; gap: 20px; align-items: center;")
+        div#contenedorTablas.mt-4.ml-auto.mr-auto(style="display: flex; flex-direction: column; gap: 20px; align-items: center;")
             div#divBotonesEdicion(style="display: flex; gap: 10px;")
                 button#botonEditar.btn.btn-warning(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") EDITAR LISTA
                 button#botonConfirmar.btn.btn-secondary(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") CONFIRMAR CAMBIOS
-            div(style="font-size: 0.7em; text-align: center;")
-                div#contenedorPropios
+            div(style="font-size: 0.7em; text-align: center; display: flex; width: 100%; overflow-x: auto; gap: 10px; margin-left: auto; margin-right: auto;")
+                div#contenedorPropios(style='min-width: 500px; margin-left: auto;')
                     h6 PROPIOS
                     table#tablaPropios.table.table-sm.table-striped.table-bordered
                         thead
                             tr
                                 th(scope='col' style='min-width: 20px;') ORDEN
                                 th(scope='col' style='min-width: 180px;') CONDUCTOR
-                                th(scope='col' style='min-width: 80px;') TIPO
                                 th(scope='col' style='min-width: 55px;') PORTEÓ
                                 th(scope='col' style='min-width: 120px;') HORA INGRESO
                         tbody
 
-                div#contenedorAsociados
+                div#contenedorAsociados(style='min-width: 500px; margin-right: auto;')
                     h6 ASOCIADOS
                     table#tablaAsociados.table.table-sm.table-striped.table-bordered
                         thead
                             tr
                                 th(scope='col' style='min-width: 20px;') ORDEN
                                 th(scope='col' style='min-width: 180px;') CONDUCTOR
-                                th(scope='col' style='min-width: 80px;') TIPO
                                 th(scope='col' style='min-width: 55px;') PORTEÓ
                                 th(scope='col' style='min-width: 120px;') HORA INGRESO
                         tbody

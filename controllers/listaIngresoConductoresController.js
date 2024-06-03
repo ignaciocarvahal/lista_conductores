@@ -184,48 +184,54 @@ exports.cargarRankings = async (req, res) => {
         type: QueryTypes.SELECT
     });
 
-    for (let fila of dataPropios) {
-        let rut = fila.usu_rut;
-        for (let filaN of PresentacionesRetiros30Dias) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_mes'] = filaN.n_retiros;
-                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+    if (typeof dataPropios !== 'undefined' && dataPropios.length > 0) {
+        for (let fila of dataPropios) {
+            let rut = fila.usu_rut;
+            for (let filaN of PresentacionesRetiros30Dias) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_mes'] = filaN.n_retiros;
+                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                }
             }
-        }
-        for (let filaN of PresentacionesRetirosDelDia) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_hoy'] = filaN.n_retiros;
-                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
-            }
-        }
-    }
-    for (let fila of dataAsociados) {
-        let rut = fila.usu_rut;
-        for (let filaN of PresentacionesRetiros30Dias) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_mes'] = filaN.n_retiros;
-                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
-            }
-        }
-        for (let filaN of PresentacionesRetirosDelDia) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_hoy'] = filaN.n_retiros;
-                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+            for (let filaN of PresentacionesRetirosDelDia) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_hoy'] = filaN.n_retiros;
+                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                }
             }
         }
     }
-    for (let fila of dataPorEliminar) {
-        let rut = fila.usu_rut;
-        for (let filaN of PresentacionesRetiros30Dias) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_mes'] = filaN.n_retiros;
-                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+    if (typeof dataAsociados !== 'undefined' && dataAsociados.length > 0) {
+        for (let fila of dataAsociados) {
+            let rut = fila.usu_rut;
+            for (let filaN of PresentacionesRetiros30Dias) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_mes'] = filaN.n_retiros;
+                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                }
+            }
+            for (let filaN of PresentacionesRetirosDelDia) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_hoy'] = filaN.n_retiros;
+                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                }
             }
         }
-        for (let filaN of PresentacionesRetirosDelDia) {
-            if (rut === filaN.rut) {
-                fila['n_retiros_hoy'] = filaN.n_retiros;
-                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+    }
+    if (typeof dataPorEliminar !== 'undefined' && dataPorEliminar.length > 0) {
+        for (let fila of dataPorEliminar) {
+            let rut = fila.usu_rut;
+            for (let filaN of PresentacionesRetiros30Dias) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_mes'] = filaN.n_retiros;
+                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                }
+            }
+            for (let filaN of PresentacionesRetirosDelDia) {
+                if (rut === filaN.rut) {
+                    fila['n_retiros_hoy'] = filaN.n_retiros;
+                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                }
             }
         }
     }

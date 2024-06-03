@@ -106,131 +106,133 @@ exports.cargarRankings = async (req, res) => {
         rutArray.push(fila.usu_rut);
     }
 
-    let PresentacionesRetiros30Dias = await db.data_warehouse.query(`
-    SELECT
-        conductor.rut AS rut,
-        conductor.tipo_conductor AS tipo,
-        COUNT(conductor.rut) FILTER (
-			WHERE etapa.codigo = '1'
-			AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
-        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
-			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
-		) AS n_retiros,
-        COUNT(conductor.rut) FILTER (
-			WHERE etapa.codigo = '2'
-			AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
-        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
-			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
-		) AS n_presentaciones
-    FROM
-        public.conductor AS conductor
-	LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
-    LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
-    LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
-    WHERE
-		conductor.rut IN (:ruts)
-        AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
-        AND etapa.codigo IN ('1', '2')
-    GROUP BY
-        conductor.tipo_conductor,
-		conductor.rut
-    ORDER BY
-		conductor.tipo_conductor ASC,
-        conductor.rut ASC
-    `,
-    {
-        replacements: {
-            ruts: rutArray
-        },
-        type: QueryTypes.SELECT
-    });
+    if (rutArray.length > 0) {
+        let PresentacionesRetiros30Dias = await db.data_warehouse.query(`
+        SELECT
+            conductor.rut AS rut,
+            conductor.tipo_conductor AS tipo,
+            COUNT(conductor.rut) FILTER (
+                WHERE etapa.codigo = '1'
+                AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
+                AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+                AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+            ) AS n_retiros,
+            COUNT(conductor.rut) FILTER (
+                WHERE etapa.codigo = '2'
+                AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
+                AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+                AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+            ) AS n_presentaciones
+        FROM
+            public.conductor AS conductor
+        LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
+        LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
+        LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
+        WHERE
+            conductor.rut IN (:ruts)
+            AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
+            AND etapa.codigo IN ('1', '2')
+        GROUP BY
+            conductor.tipo_conductor,
+            conductor.rut
+        ORDER BY
+            conductor.tipo_conductor ASC,
+            conductor.rut ASC
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
 
-    let PresentacionesRetirosDelDia = await db.data_warehouse.query(`
-    SELECT
-        conductor.rut AS rut,
-        conductor.tipo_conductor AS tipo,
-        COUNT(conductor.rut) FILTER (
-			WHERE etapa.codigo = '1'
-			AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
-        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
-			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
-		) AS n_retiros,
-        COUNT(conductor.rut) FILTER (
-			WHERE etapa.codigo = '2'
-			AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
-        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
-			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
-		) AS n_presentaciones
-    FROM
-        public.conductor AS conductor
-	LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
-    LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
-    LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
-    WHERE
-		conductor.rut IN (:ruts)
-        AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
-        AND etapa.codigo IN ('1', '2')
-    GROUP BY
-        conductor.tipo_conductor,
-		conductor.rut
-    ORDER BY
-		conductor.tipo_conductor ASC,
-        conductor.rut ASC
-    `,
-    {
-        replacements: {
-            ruts: rutArray
-        },
-        type: QueryTypes.SELECT
-    });
+        let PresentacionesRetirosDelDia = await db.data_warehouse.query(`
+        SELECT
+            conductor.rut AS rut,
+            conductor.tipo_conductor AS tipo,
+            COUNT(conductor.rut) FILTER (
+                WHERE etapa.codigo = '1'
+                AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
+                AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+                AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+            ) AS n_retiros,
+            COUNT(conductor.rut) FILTER (
+                WHERE etapa.codigo = '2'
+                AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
+                AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+                AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+            ) AS n_presentaciones
+        FROM
+            public.conductor AS conductor
+        LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
+        LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
+        LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
+        WHERE
+            conductor.rut IN (:ruts)
+            AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
+            AND etapa.codigo IN ('1', '2')
+        GROUP BY
+            conductor.tipo_conductor,
+            conductor.rut
+        ORDER BY
+            conductor.tipo_conductor ASC,
+            conductor.rut ASC
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
 
-    if (typeof dataPropios !== 'undefined' && dataPropios.length > 0) {
-        for (let fila of dataPropios) {
-            let rut = fila.usu_rut;
-            for (let filaN of PresentacionesRetiros30Dias) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_mes'] = filaN.n_retiros;
-                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+        if (typeof dataPropios !== 'undefined' && dataPropios.length > 0) {
+            for (let fila of dataPropios) {
+                let rut = fila.usu_rut;
+                for (let filaN of PresentacionesRetiros30Dias) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_mes'] = filaN.n_retiros;
+                        fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                    }
                 }
-            }
-            for (let filaN of PresentacionesRetirosDelDia) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_hoy'] = filaN.n_retiros;
-                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                for (let filaN of PresentacionesRetirosDelDia) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_hoy'] = filaN.n_retiros;
+                        fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                    }
                 }
             }
         }
-    }
-    if (typeof dataAsociados !== 'undefined' && dataAsociados.length > 0) {
-        for (let fila of dataAsociados) {
-            let rut = fila.usu_rut;
-            for (let filaN of PresentacionesRetiros30Dias) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_mes'] = filaN.n_retiros;
-                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+        if (typeof dataAsociados !== 'undefined' && dataAsociados.length > 0) {
+            for (let fila of dataAsociados) {
+                let rut = fila.usu_rut;
+                for (let filaN of PresentacionesRetiros30Dias) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_mes'] = filaN.n_retiros;
+                        fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                    }
                 }
-            }
-            for (let filaN of PresentacionesRetirosDelDia) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_hoy'] = filaN.n_retiros;
-                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                for (let filaN of PresentacionesRetirosDelDia) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_hoy'] = filaN.n_retiros;
+                        fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                    }
                 }
             }
         }
-    }
-    if (typeof dataPorEliminar !== 'undefined' && dataPorEliminar.length > 0) {
-        for (let fila of dataPorEliminar) {
-            let rut = fila.usu_rut;
-            for (let filaN of PresentacionesRetiros30Dias) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_mes'] = filaN.n_retiros;
-                    fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+        if (typeof dataPorEliminar !== 'undefined' && dataPorEliminar.length > 0) {
+            for (let fila of dataPorEliminar) {
+                let rut = fila.usu_rut;
+                for (let filaN of PresentacionesRetiros30Dias) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_mes'] = filaN.n_retiros;
+                        fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+                    }
                 }
-            }
-            for (let filaN of PresentacionesRetirosDelDia) {
-                if (rut === filaN.rut) {
-                    fila['n_retiros_hoy'] = filaN.n_retiros;
-                    fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                for (let filaN of PresentacionesRetirosDelDia) {
+                    if (rut === filaN.rut) {
+                        fila['n_retiros_hoy'] = filaN.n_retiros;
+                        fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+                    }
                 }
             }
         }

@@ -5,7 +5,9 @@ script.
 
     /************ Variables ************/
 
-    let dataTableConfig = {
+    const COLUMNA_BOTON = 8;
+
+    let dataTablePorEliminarConfig = {
         language: dataTable_CL,
         paging: false,
         rowReorder: {
@@ -17,17 +19,65 @@ script.
             {data: 'ranking'},
             {data: 'conductor'},
             {data: 'porteador'},
+            {data: 'n_retiros_mes'},
+            {data: 'n_presentaciones_mes'},
+            {data: 'n_retiros_hoy'},
+            {data: 'n_presentaciones_hoy'},
             {data: 'hora_ingreso'},
         ],
         columnDefs: [
             { orderable: true, className: 'reorder', targets: 0 },
             { orderable: false, targets: '_all' },
             {
-                targets: 3,
+                targets: 7,
                 render: DataTable.render.datetime()
             },
             {  
-                targets: 4,
+                targets: COLUMNA_BOTON,
+                render: function (data, type, row, meta) {
+                    return `
+                    <input type="button" 
+                        class="eliminar btn btn-danger btn-sm"
+                        style="height: 20px; padding-top: 1px; font-size: 0.95em;"
+                        value="Eliminar"/>`;
+                },
+                visible: false
+            }
+        ],
+        createdRow: function( row, data, dataIndex ) {
+            if (data['por_eliminar'] === true) {
+                $(row).addClass('strikeout');
+            }
+        }
+    }
+
+    let dataTableRankingConfig = {
+        language: dataTable_CL,
+        paging: false,
+        rowReorder: {
+            dataSrc: 'ranking'
+        },
+        searching: false,
+        info: false,
+        columns: [
+            {data: 'ranking'},
+            {data: 'conductor'},
+            {data: 'porteador'},
+            {data: 'n_retiros_mes'},
+            {data: 'n_presentaciones_mes'},
+            {data: 'n_retiros_hoy'},
+            {data: 'n_presentaciones_hoy'},
+            {data: 'hora_ingreso'},
+        ],
+        columnDefs: [
+            { orderable: true, className: 'reorder', targets: 0 },
+            { orderable: false, targets: '_all' },
+            {
+                targets: 7,
+                render: DataTable.render.datetime()
+            },
+            {  
+                targets: COLUMNA_BOTON,
                 render: function (data, type, row, meta) {
                     return `
                     <input type="button" 
@@ -76,6 +126,73 @@ script.
         return formattedData;
     }
 
+    function clearForm() {
+        $('#formularioIngreso').find('input, textarea, select').each(function() {
+            if($(this).is(':checkbox') || $(this).is(':radio')) {
+                $(this).prop('checked', false);
+            } else if($(this).is('select')) {
+                $(this).prop('selectedIndex', 0);
+            } else if($(this).is(':submit')) {
+                console.log(this);
+            } else {
+                $(this).val('');
+            }
+        });
+    }
+
+    function initializeTables() {
+        fetchRankings().then(data => {
+            console.log("data:", data);
+            let tablaPropios = $('#tablaPropios').DataTable(dataTableRankingConfig);
+            tablaPropios.rows.add(data.propios).draw();
+            tablaPropios.rowReorder.disable();
+
+            let tablaAsociados = $('#tablaAsociados').DataTable(dataTableRankingConfig);
+            tablaAsociados.rows.add(data.asociados).draw();
+            tablaAsociados.rowReorder.disable();
+
+            console.log(data.por_eliminar);
+            let tablaPorEliminar = $('#tablaPorEliminar').DataTable(dataTablePorEliminarConfig);
+            tablaPorEliminar.rows.add(data.por_eliminar).draw();
+            tablaPorEliminar.rowReorder.disable();
+
+            $('#tablaPropios tbody ').on('click', '.eliminar', function (event) {
+                toggleForDeletion(this);
+            });
+        
+            $('#tablaAsociados tbody ').on('click', '.eliminar', function (event) {
+                toggleForDeletion(this);
+            });
+
+            $('#botonEditar').on('click', function (event) {
+                toggleEdit(tablaPropios, tablaAsociados);
+            });
+
+            $('#botonEditar').prop('disabled', false);
+
+            $('#botonConfirmar').on('click', function (event) {
+                console.log('Confirmado!');
+                confirmarCambios(tablaPropios.data().toArray(), tablaAsociados.data().toArray());
+            });
+        })
+    }
+
+    function refreshTables() {
+        fetchRankings().then(data => {
+            let tablaPropios = $('#tablaPropios').DataTable();
+            tablaPropios.clear();
+            tablaPropios.rows.add(data.propios).draw();
+
+            let tablaAsociados = $('#tablaAsociados').DataTable();
+            tablaAsociados.clear();
+            tablaAsociados.rows.add(data.asociados).draw();
+            
+            let tablaPorEliminar = $('#tablaPorEliminar').DataTable();
+            tablaPorEliminar.clear();
+            tablaPorEliminar.rows.add(data.por_eliminar).draw();
+        });
+    }
+
     /***********************************/
 
     function enviarCambios(reordenados, eliminados) {
@@ -116,6 +233,7 @@ script.
                 cambios.push(dataRow);
             }
         }
+
         for (let dataRow of asociados) {
             dataRow['delta_ranking'] = calcDeltaRanking(dataRow);
             if (dataRow['delta_ranking'] != 0) {
@@ -130,6 +248,7 @@ script.
                 cambios.push(dataRow);
             }
         }
+
         console.log("cambios", cambios);
         console.log("eliminados", eliminados);
 
@@ -149,9 +268,21 @@ script.
                     try {
                         $('#botonEditar').prop('disabled', true);
                         $('#botonConfirmar').prop('disabled', true);
-                        const response = await enviarCambios(cambios, eliminados);
-                        return response.json();
+                        $.ajax({
+                            url: '/mantenedor/cambios',
+                            method: 'POST',
+                            data: { reordenados: cambios, porEliminar: eliminados },
+                            success: function(response) {
+                                // console.log(response);
+                                return response.json();
+                            },
+                            error: function(xhr, status, error) {
+                                // Handle error
+                                console.error('Error submitting form:', error);
+                            }
+                        });
                     } catch (error) {
+                        console.log(error);
                         Swal.showValidationMessage(`
                             Hubo un problema guardando los cambios.
                         `);
@@ -160,6 +291,7 @@ script.
                 allowOutsideClick: () => !Swal.isLoading()
             }).then((result) => {
                 if (result.isConfirmed) {
+                    refreshTables();
                     $('#botonEditar').prop('disabled', false);
                     $('#botonConfirmar').prop('disabled', false);
                     toggleEdit($('#tablaPropios').DataTable(), $('#tablaAsociados').DataTable());
@@ -173,27 +305,33 @@ script.
         }
     }
 
-    function toggleDelete(buttonElem) {
+    function toggleForDeletion(buttonElem) {
         let button = $(buttonElem);
 
         let row = button.closest("tr");
         let table = button.closest("table");
         let dataTable = table.DataTable();
-        let removedData = dataTable.row(row).data();
-        let removedRanking = removedData.ranking;
+        let rowData = dataTable.row(row).data();
+        // let removedRanking = rowData.ranking;
 
-        let willDelete = removedData.eliminado;
+        let willDelete = rowData.por_eliminar;
         if (!willDelete) {
             Swal.fire({
-                title: 'Confirmar Eliminación',
-                text: '¿Desea eliminar esta fila?',
+                title: 'Confirmar',
+                text: '¿Desea marcar esta fila para eliminación?',
                 showCancelButton: true,
             }).then(result => {
                 if (result.isConfirmed) {
+                    buttonElem.value = 'Cancelar';
+                    button.toggleClass('btn-warning btn-danger');
+                    row.toggleClass('strikeout');
+                    rowData.por_eliminar = !willDelete;
+                    eliminados.push(rowData);
+                    /*
                     console.log("iniciar proceso de eliminacion");
-                    eliminados.push(removedData);
+                    eliminados.push(rowData);
                     let ordenBuffer;
-                    let ordenOld = removedData.orden;
+                    let ordenOld = rowData.orden;
                     dataTable.row(row).remove().draw(false);
                     dataTable.rows().every(function(rowIdx, tableLoop, rowLoop) {
                         let data = this.data();
@@ -213,15 +351,15 @@ script.
                         }
                     });
                     dataTable.draw();
+                    */
                 }
             })
+        } else {
+            buttonElem.value = 'Eliminar';
+            button.toggleClass('btn-warning btn-danger');
+            row.toggleClass('strikeout');
+            rowData.por_eliminar = !willDelete;
         }
-        buttonElem.value = willDelete? 'Eliminar' : 'Cancelar';
-        button.toggleClass('btn-warning btn-danger');
-        row.toggleClass('bg-danger text-white');
-        removedData.eliminado = !willDelete;
-        let dataAfter = table.DataTable().row( row ).data();
-        console.log("data after:", dataAfter);
     }
 
     function toggleEdit(tablaPropios, tablaAsociados) {
@@ -229,8 +367,8 @@ script.
         let botonEditar = $('#botonEditar');
         let botonConfirmar = $('#botonConfirmar');
 
-        tablaPropios.column(4).visible(canEdit);
-        tablaAsociados.column(4).visible(canEdit);
+        tablaPropios.column(COLUMNA_BOTON).visible(canEdit);
+        tablaAsociados.column(COLUMNA_BOTON).visible(canEdit);
         botonEditar.toggleClass('btn-warning btn-danger');
         botonConfirmar.toggleClass('btn-secondary btn-success');
         botonConfirmar.prop('disabled', !canEdit);
@@ -255,24 +393,6 @@ script.
                 success: function(response) {
                     let formattedResponse = formatConductores(response);
                     resolve(formattedResponse);
-                },
-                error: function(xhr, status, error) {
-                    // Handle error
-                    console.error('Error enviando datos:', error);
-                    reject(error);
-                }
-            });
-        });
-    }
-
-    function getPresentacionesRetiros30Dias() {
-        return new Promise((resolve, reject) => {
-            $.ajax({
-                url: '/conductores/presentaciones_retiros_mes',
-                method: 'GET',
-                data: {},
-                success: function(response) {
-                    resolve(response);
                 },
                 error: function(xhr, status, error) {
                     // Handle error
@@ -313,69 +433,68 @@ script.
             $('#submit').prop('disabled', false);
         });
 
-        getPresentacionesRetiros30Dias().then(data => {
-            console.log(data);
-        });
-
-        fetchRankings().then(data => {
-            let tablaPropios = $('#tablaPropios').DataTable(dataTableConfig);
-            tablaPropios.rows.add(data.propios).draw();
-            tablaPropios.rowReorder.disable();
-
-            let tablaAsociados = $('#tablaAsociados').DataTable(dataTableConfig);
-            tablaAsociados.rows.add(data.asociados).draw();
-            tablaAsociados.rowReorder.disable();
-
-            $('#tablaPropios tbody ').on('click', '.eliminar', function (event) {
-                toggleDelete(this);
-            });
-    
-            $('#tablaAsociados tbody ').on('click', '.eliminar', function (event) {
-                toggleDelete(this);
-            });
-
-            $('#botonEditar').on('click', function (event) {
-                toggleEdit(tablaPropios, tablaAsociados);
-            });
-
-            $('#botonEditar').prop('disabled', false);
-
-            $('#botonConfirmar').on('click', function (event) {
-                console.log('Confirmado!');
-                confirmarCambios(tablaPropios.data().toArray(), tablaAsociados.data().toArray());
-            });
-        });
+        initializeTables();
 
         $('#formularioIngreso').on("submit", function(event) {
             // Prevent the form from submitting in the traditional manner
             event.preventDefault();
             $('#submit').prop('disabled', true);
-            
-            var formData = serializeToObject(this);
-            // Add 'data-tipo' information, as serialize() does not include it
-            formData['tipo'] = $('#conductorSelect option:selected').data('tipo');
-            console.log(formData);
-            
-            // Send form data asynchronously using AJAX
-            $.ajax({
-            url: '/conductores/add',
-            method: 'POST',
-            data: formData,
-            success: function(response) {
-                // Handle successful response
-                console.log('Form submitted successfully:', response);
+
+            // Verificación de datos
+            if (!Object.keys(conductoresObj).includes($('#conductorText').val())) {
                 Swal.fire({
-                    text: 'Se han ingresado los datos correctamente.',
-                    icon: 'success'
+                    text: 'Verifique los datos ingresados',
+                    icon: 'error'
                 })
-            },
-            error: function(xhr, status, error) {
-                // Handle error
-                console.error('Error submitting form:', error);
+                $('#submit').prop('disabled', false);
+                return;
             }
-            });
-            // Regardless of the result, re-enable the submit button
-            $('#submit').prop('disabled', false);
+
+            Swal.fire({
+                text: '¿Estás seguro de ingresar estos datos?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: "Enviar",
+                showLoaderOnConfirm: true,
+                preConfirm: async () => {
+                    try {
+                        var formData = serializeToObject($('#formularioIngreso'));
+                        // Add 'data-tipo' information, as serialize() does not include it
+                        formData['tipo'] = $('#conductorSelect option:selected').data('tipo');
+
+                        $.ajax({
+                            url: '/conductores/add',
+                            method: 'POST',
+                            data: formData,
+                            success: function(response) {
+                                // Handle successful response
+                                console.log('Form submitted successfully:', response);
+                            },
+                            error: function(xhr, status, error) {
+                                // Handle error
+                                Swal.fire({
+                                    text: 'Ha ocurrido un error enviando los datos.',
+                                    icon: 'error'
+                                })
+                            }
+                        });
+                        $('#submit').prop('disabled', false);
+                    } catch (error) {
+                        Swal.showValidationMessage(`
+                            Ha ocurrido un error enviando los datos
+                        `);
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        text: 'Se han ingresado los datos correctamente.',
+                        icon: 'success'
+                    })
+                    clearForm();
+                    refreshTables();
+                }
+            })
         });
 
         $('#conductorSelect').on("change", function() {

@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { json, QueryTypes } = require('sequelize');
+const { json, QueryTypes, Sequelize } = require('sequelize');
 
 exports.cargarConductores = async (req, res) => {
     let Conductores = await db.query(`
@@ -27,8 +27,22 @@ exports.cargarConductores = async (req, res) => {
 
 exports.agregarConductorEnListaIngreso = async (req, res) => {
     let reqJSON = req.body;
+    let error = false;
 
     //TODO: hacer validaciones server-side
+
+    // Validar que vengan todos los campos necesarios
+    ['conductorSelect', 'conductorText', 'tipo'].every((item) => {
+        if (!reqJSON.hasOwnProperty(item)) {
+            error = true;
+        };
+        return !error;
+    });
+
+    if (error) {
+        res.status(400).json({ message: 'error' });
+        return;
+    }
 
     if (reqJSON.hasOwnProperty('porteador')) {
         reqJSON['porteador'] = true;
@@ -50,47 +64,7 @@ exports.agregarConductorEnListaIngreso = async (req, res) => {
         type: QueryTypes.INSERT
     });
 
-    res.json({ test: 'hola' });
-};
-
-exports.cargarPresentacionesRetirosMes = async (req, res) => {
-    let PresentacionesRetiros30Dias = await db.data_warehouse.query(`
-        SELECT
-        "public"."etapa"."codigo" AS "codigo",
-        "Conductor"."nombre" AS "Conductor__nombre",
-        COUNT(*) AS "count"
-        FROM
-        "public"."etapa"
-        LEFT JOIN "public"."conductor" AS "Conductor" ON "public"."etapa"."id_etapa" = "Conductor"."id_conductor"
-        LEFT JOIN "public"."caracteristicas" AS "Caracteristicas" ON "public"."etapa"."id_etapa" = "Caracteristicas"."id_caracteristicas"
-        LEFT JOIN "public"."time" AS "Time" ON "public"."etapa"."id_etapa" = "Time"."id_time"
-        WHERE
-        (
-            ("Conductor"."tipo_conductor" = 'ASOCIADO')
-    
-        )
-        AND (
-            "Time"."etapa_1_fecha" >= CAST((NOW() + INTERVAL '-30 day') AS date)
-        )
-        AND (
-            "Time"."etapa_1_fecha" < CAST((NOW() + INTERVAL '1 day') AS date)
-        )
-        AND (
-            ("public"."etapa"."codigo" = '2')
-            OR ("public"."etapa"."codigo" = '1')
-        )
-        AND (
-            "Time"."etapa_1_fecha" >= timestamp with time zone '2024-05-09 00:00:00.000Z'
-        )
-        GROUP BY
-        "public"."etapa"."codigo",
-        "Conductor"."nombre"
-        ORDER BY
-        "public"."etapa"."codigo" ASC,
-        "Conductor"."nombre" ASC
-    `);
-
-    res.json(PresentacionesRetiros30Dias[0]);
+    res.json({ message: 'success' });
 };
 
 exports.cargarRankings = async (req, res) => {
@@ -98,21 +72,175 @@ exports.cargarRankings = async (req, res) => {
 
     let RankingPropios = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_propios;
-    `);
+    `, {
+        type: QueryTypes.SELECT
+    });
 
     let RankingAsociados = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_asociados;
-    `);
+    `, {
+        type: QueryTypes.SELECT
+    });
+
+    let RankingPorEliminar = await db.n_virginia.query(`
+    SELECT * FROM ranking_ingreso_conductores_por_eliminar;
+    `, {
+        type: QueryTypes.SELECT
+    });
+
+    dataPropios = RankingPropios;
+    dataAsociados = RankingAsociados;
+    dataPorEliminar = RankingPorEliminar;
+
+    console.log(dataPropios);
+
+    let rutArray = [];
+
+    for (let fila of dataPropios) {
+        rutArray.push(fila.usu_rut);
+    }
+    for (let fila of dataAsociados) {
+        rutArray.push(fila.usu_rut);
+    }
+    for (let fila of dataPorEliminar) {
+        rutArray.push(fila.usu_rut);
+    }
+
+    let PresentacionesRetiros30Dias = await db.data_warehouse.query(`
+    SELECT
+        conductor.rut AS rut,
+        conductor.tipo_conductor AS tipo,
+        COUNT(conductor.rut) FILTER (
+			WHERE etapa.codigo = '1'
+			AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
+        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+		) AS n_retiros,
+        COUNT(conductor.rut) FILTER (
+			WHERE etapa.codigo = '2'
+			AND tiempo.etapa_1_fecha >= CAST((NOW() + INTERVAL '-30 day') AS date)
+        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+		) AS n_presentaciones
+    FROM
+        public.conductor AS conductor
+	LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
+    LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
+    LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
+    WHERE
+		conductor.rut IN (:ruts)
+        AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
+        AND etapa.codigo IN ('1', '2')
+    GROUP BY
+        conductor.tipo_conductor,
+		conductor.rut
+    ORDER BY
+		conductor.tipo_conductor ASC,
+        conductor.rut ASC
+    `,
+    {
+        replacements: {
+            ruts: rutArray
+        },
+        type: QueryTypes.SELECT
+    });
+
+    let PresentacionesRetirosDelDia = await db.data_warehouse.query(`
+    SELECT
+        conductor.rut AS rut,
+        conductor.tipo_conductor AS tipo,
+        COUNT(conductor.rut) FILTER (
+			WHERE etapa.codigo = '1'
+			AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
+        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+		) AS n_retiros,
+        COUNT(conductor.rut) FILTER (
+			WHERE etapa.codigo = '2'
+			AND tiempo.etapa_1_fecha >= CAST(NOW() AS date)
+        	AND tiempo.etapa_1_fecha < CAST((NOW() + INTERVAL '1 day') AS date)
+			AND tiempo.etapa_1_fecha >= timestamp with time zone '2024-05-09 00:00:00.000Z'
+		) AS n_presentaciones
+    FROM
+        public.conductor AS conductor
+	LEFT JOIN public.etapa AS etapa ON etapa.id_etapa = conductor.id_conductor
+    LEFT JOIN public.caracteristicas AS caracteristicas ON etapa.id_etapa = caracteristicas.id_caracteristicas
+    LEFT JOIN public.time AS tiempo ON etapa.id_etapa = tiempo.id_time
+    WHERE
+		conductor.rut IN (:ruts)
+        AND conductor.tipo_conductor IN ('PROPIO', 'ASOCIADO', 'TERCERO')
+        AND etapa.codigo IN ('1', '2')
+    GROUP BY
+        conductor.tipo_conductor,
+		conductor.rut
+    ORDER BY
+		conductor.tipo_conductor ASC,
+        conductor.rut ASC
+    `,
+    {
+        replacements: {
+            ruts: rutArray
+        },
+        type: QueryTypes.SELECT
+    });
+
+    for (let fila of dataPropios) {
+        let rut = fila.usu_rut;
+        for (let filaN of PresentacionesRetiros30Dias) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_mes'] = filaN.n_retiros;
+                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+            }
+        }
+        for (let filaN of PresentacionesRetirosDelDia) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_hoy'] = filaN.n_retiros;
+                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+            }
+        }
+    }
+    for (let fila of dataAsociados) {
+        let rut = fila.usu_rut;
+        for (let filaN of PresentacionesRetiros30Dias) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_mes'] = filaN.n_retiros;
+                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+            }
+        }
+        for (let filaN of PresentacionesRetirosDelDia) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_hoy'] = filaN.n_retiros;
+                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+            }
+        }
+    }
+    for (let fila of dataPorEliminar) {
+        let rut = fila.usu_rut;
+        for (let filaN of PresentacionesRetiros30Dias) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_mes'] = filaN.n_retiros;
+                fila['n_presentaciones_mes'] = filaN.n_presentaciones;
+            }
+        }
+        for (let filaN of PresentacionesRetirosDelDia) {
+            if (rut === filaN.rut) {
+                fila['n_retiros_hoy'] = filaN.n_retiros;
+                fila['n_presentaciones_hoy'] = filaN.n_presentaciones;
+            }
+        }
+    }
 
     res.json({
-        propios: RankingPropios[0],
-        asociados: RankingAsociados[0],
+        propios: dataPropios,
+        asociados: dataAsociados,
+        por_eliminar: dataPorEliminar,
     });
 };
 
 exports.guardarCambiosMantenedor = async (req, res) => {
+    console.log("INICIANDIO SERVERSIDE GUARDAR CAMBIOS MANTENEDOR");
     let reordenadosArray = req.body['reordenados'];
-    let eliminadosArray = req.body['eliminados'];
+    let marcadosEliminacionArray = req.body['porEliminar'];
 
     if (typeof reordenadosArray !== 'undefined' && reordenadosArray.length > 0) {
         for (let dataCambio of reordenadosArray) {
@@ -133,25 +261,25 @@ exports.guardarCambiosMantenedor = async (req, res) => {
         }
     }
     
-    if (typeof eliminadosArray !== 'undefined' && eliminadosArray.length > 0) {
-        for (let dataEliminado of eliminadosArray) {
-            console.log(dataEliminado);
+    if (typeof marcadosEliminacionArray !== 'undefined' && marcadosEliminacionArray.length > 0) {
+        for (let dataMarcadoEliminacion of marcadosEliminacionArray) {
+            console.log(dataMarcadoEliminacion);
             await db.n_virginia.query(`
                 UPDATE mantenedor_ingreso_conductores
-                    SET eliminado = :eliminado
+                    SET por_eliminar = :por_eliminar
                     WHERE fk_ingreso = :fk_ingreso;   
             `,
             {
                 replacements: {
-                    fk_ingreso: parseInt(dataEliminado['id']),
-                    eliminado: dataEliminado['eliminado'],
+                    fk_ingreso: parseInt(dataMarcadoEliminacion['id']),
+                    por_eliminar: dataMarcadoEliminacion['por_eliminar'],
                 },
                 type: QueryTypes.UPDATE
             });
             console.log('ENVIADO');
         }
     }
-
+    console.log("hola");
     // TODO: response en caso de error
     res.json({ response: 'success' });
 };

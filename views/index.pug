@@ -5,6 +5,7 @@ html
         link(rel='stylesheet', href='./css/bootstrap.min.css')
         link(rel='stylesheet', href='./css/dataTables.bootstrap4.min.css')
         link(rel='stylesheet', href='./css/rowReorder.dataTables.min.css')
+        link(rel='stylesheet', href='./css/stateRestore.dataTables.min.css')
         link(rel="stylesheet", href="./css/jquery-ui.css")
         style(type="text/css").
             custom-menu {
@@ -41,24 +42,10 @@ html
                     label.ml-1(for='porteador') PORTEÓ
                     br
                     input#submit.btn.btn-success(type='submit' value='INGRESAR A LISTA' disabled=true style="height: 24px; font-size: 0.85em; padding-top: 3px; min-width: 130px;") 
-        div#contenedorTablas.mt-4.ml-auto.mr-auto(style="display: flex; flex-direction: column; gap: 20px; align-items: center;")
+        div#contenedorTablas.mt-4.ml-auto.mr-auto(style="display: flex; flex-direction: column; gap: 20px; align-items: center; width: 100%;")
             div#divBotonesEdicion(style="display: flex; gap: 10px;")
                 button#botonEditar.btn.btn-warning(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") EDITAR LISTA
                 button#botonConfirmar.btn.btn-secondary(disabled=true style="height: 24px; font-size: 0.68em; padding-top: 3px; margin-top: 5px; min-width: 130px; max-width:150px;") CONFIRMAR CAMBIOS
-            div#contenedorPorEliminar(style='display:flex; flex-direction: column; min-width: 670px; margin-left: auto; margin-right:auto; font-size: 0.7em;')
-                    h6 POR ELIMINAR
-                    table#tablaPorEliminar.table.table-sm.table-striped.table-bordered
-                        thead
-                            tr
-                                th(scope='col' style='min-width: 20px;') ORDEN
-                                th(scope='col' style='min-width: 150px;') CONDUCTOR
-                                th(scope='col' style='min-width: 55px;') PORTEÓ
-                                th(scope='col' style='min-width: 55px;') RETIROS (MES)
-                                th(scope='col' style='min-width: 55px;') PRES. (MES)
-                                th(scope='col' style='min-width: 55px;') RETIROS (HOY)
-                                th(scope='col' style='min-width: 55px;') PRES. (HOY)
-                                th(scope='col' style='min-width: 120px;') HORA INGRESO
-                        tbody
             div(style="font-size: 0.7em; text-align: center; display: flex; width: 100%; overflow-x: auto; gap: 10px; margin-left: auto; margin-right: auto;")
                 div#contenedorPropios(style='min-width: 670px; margin-left: auto;')
                     h6 PROPIOS
@@ -89,5 +76,20 @@ html
                                 th(scope='col' style='min-width: 55px;') PRES. (HOY)
                                 th(scope='col' style='min-width: 120px;') HORA INGRESO
                         tbody
+            div#contenedorPorEliminar(style='display:flex; text-align: center; flex-direction: column; min-width: 670px; margin-left: auto; margin-right:auto; font-size: 0.7em;')
+                h6 POR ELIMINAR
+                table#tablaPorEliminar.table.table-sm.table-striped.table-bordered
+                    thead
+                        tr
+                            th(scope='col' style='min-width: 20px;') ORDEN
+                            th(scope='col' style='min-width: 150px;') CONDUCTOR
+                            th(scope='col' style='min-width: 55px;') PORTEÓ
+                            th(scope='col' style='min-width: 55px;') RETIROS (MES)
+                            th(scope='col' style='min-width: 55px;') PRES. (MES)
+                            th(scope='col' style='min-width: 55px;') RETIROS (HOY)
+                            th(scope='col' style='min-width: 55px;') PRES. (HOY)
+                            th(scope='col' style='min-width: 120px;') HORA INGRESO
+                    tbody
+                 
         include ./common-scripts.pug
         include ./script.pug

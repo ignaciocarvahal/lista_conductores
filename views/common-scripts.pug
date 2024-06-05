@@ -293,8 +293,11 @@ script.
                 renameKey(dataRow, 'usu_rut', 'rut');
                 renameKey(dataRow, 'createdAt', 'hora_ingreso');
                 dataRow['ranking_original'] = dataRow['ranking'];
-                if (dataRow['porteador']) {
+                if (dataRow['porteador'] || dataRow['n_retiros_hoy'] > 0) {
                     dataRow['conductor'] += ' <b>[P]</b>';
+                    if (dataRow['n_retiros_hoy'] > 1) {
+                        dataRow['conductor'] += ' <b>[P]</b>';
+                    }
                 }
                 dataRow['porteador'] = dataRow['porteador']? 'SI' : 'NO';
                 

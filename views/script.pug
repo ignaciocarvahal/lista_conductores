@@ -44,6 +44,15 @@ script.
                         value="Eliminar"/>`;
                 },
                 visible: false
+            },
+            {
+                targets: 2,
+                render: function (data, type, row, meta) {
+                    const checked = data? 'checked': '';
+                    return `
+                    <input type="checkbox" 
+                        disabled=true ${checked}/>`;
+                }
             }
         ],
         createdRow: function( row, data, dataIndex ) {
@@ -89,6 +98,15 @@ script.
                         value="Eliminar"/>`;
                 },
                 visible: false
+            },
+            {
+                targets: 2,
+                render: function (data, type, row, meta) {
+                    const checked = data? 'checked': '';
+                    return `
+                    <input type="checkbox" 
+                        class="porteoEdicion" ${checked}/>`;
+                }
             }
         ],
         createdRow: function( row, data, dataIndex ) {
@@ -160,17 +178,24 @@ script.
             tablaAsociados.rows.add(data.asociados).draw();
             tablaAsociados.rowReorder.disable();
 
-            console.log(data.por_eliminar);
             let tablaPorEliminar = $('#tablaPorEliminar').DataTable(dataTablePorEliminarConfig);
             tablaPorEliminar.rows.add(data.por_eliminar).draw();
             tablaPorEliminar.rowReorder.disable();
 
-            $('#tablaPropios tbody ').on('click', '.eliminar', function (event) {
+            $('#contenedorTablas tbody').on('click', '.eliminar', function (event) {
                 toggleForDeletion(this);
             });
-        
-            $('#tablaAsociados tbody ').on('click', '.eliminar', function (event) {
-                toggleForDeletion(this);
+            $('#contenedorTablas tbody').on('click', '.porteo', function (event) {
+                const checkbox = $(this);
+
+                clearTimeout(checkbox.data('timeout'));
+                const timeout = setTimeout(() => {
+                    enviarCambioPorteo(this).then(() => {
+                        console.log('Enviado cambio checkbox');
+                    });
+                }, 1500);
+
+                checkbox.data('timeout', timeout);
             });
 
             $('#botonEditar').on('click', function (event) {
@@ -207,9 +232,38 @@ script.
     function enviarCambios(reordenados, eliminados) {
         return new Promise((resolve, reject) => {
             $.ajax({
-                url: '/mantenedor/cambios',
+                url: '/conductores/change',
                 method: 'POST',
                 data: { reordenados: reordenados, eliminados: eliminados },
+                success: function(response) {
+                    // console.log(response);
+                    resolve(response);
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error submitting form:', error);
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    function enviarCambioPorteo(checkboxPorteo) {
+        const checkbox = $(checkboxPorteo);
+
+        let table = checkbox.closest("table");
+        let dataTable = table.DataTable();
+
+        let row = checkbox.closest("tr");
+        let rowData = dataTable.row(row).data();
+
+        rowData['porteador'] = checkbox.is(':checked');
+
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/conductores/change',
+                method: 'POST',
+                data: { porteo: rowData },
                 success: function(response) {
                     // console.log(response);
                     resolve(response);
@@ -278,7 +332,7 @@ script.
                         $('#botonEditar').prop('disabled', true);
                         $('#botonConfirmar').prop('disabled', true);
                         $.ajax({
-                            url: '/mantenedor/cambios',
+                            url: '/conductores/change',
                             method: 'POST',
                             data: { reordenados: cambios, porEliminar: eliminados },
                             success: function(response) {
@@ -304,6 +358,7 @@ script.
                     $('#botonEditar').prop('disabled', false);
                     $('#botonConfirmar').prop('disabled', false);
                     toggleEdit($('#tablaPropios').DataTable(), $('#tablaAsociados').DataTable());
+                    eliminados = [];
                     Swal.fire({
                         title: 'Cambios Guardados',
                         icon: 'success',
@@ -467,7 +522,7 @@ script.
                 preConfirm: async () => {
                     try {
                         var formData = serializeToObject($('#formularioIngreso'));
-                        // Add 'data-tipo' information, as serialize() does not include it
+                        // agregamos la informacion de 'data-tipo', no se incluye en la serializacion
                         formData['tipo'] = $('#conductorSelect option:selected').data('tipo');
 
                         $.ajax({

@@ -189,8 +189,8 @@ exports.cargarRankings = async (req, res) => {
     });
 };
 
-exports.guardarCambiosMantenedor = async (req, res) => {
-    console.log("INICIANDIO SERVERSIDE GUARDAR CAMBIOS MANTENEDOR");
+exports.guardarCambiosConductor = async (req, res) => {
+    console.log("INICIANDIO GUARDADO CAMBIOS CONDUCTOR");
     let reordenadosArray = req.body['reordenados'];
     let marcadosEliminacionArray = req.body['porEliminar'];
 
@@ -231,7 +231,29 @@ exports.guardarCambiosMantenedor = async (req, res) => {
             console.log('ENVIADO');
         }
     }
-    console.log("hola");
+
+    /* Porteo: uno a la vez */
+    let cambioPorteo = req.body['porteo'];
+
+    if (typeof cambioPorteo !== 'undefined') {
+        try {
+            await db.n_virginia.query(`
+                UPDATE ingreso_conductores
+                    SET porteador = :porteador
+                    WHERE id = :fk_ingreso;   
+            `,
+            {
+                replacements: {
+                    fk_ingreso: parseInt(cambioPorteo['id']),
+                    porteador: cambioPorteo['porteador'],
+                },
+                type: QueryTypes.UPDATE
+            });
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
     // TODO: response en caso de error
     res.json({ response: 'success' });
 };

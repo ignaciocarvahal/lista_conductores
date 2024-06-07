@@ -44,6 +44,15 @@ script.
                         value="Eliminar"/>`;
                 },
                 visible: false
+            },
+            {
+                targets: 2,
+                render: function (data, type, row, meta) {
+                    const checked = data? 'checked': '';
+                    return `
+                    <input type="checkbox" 
+                        disabled=true ${checked}/>`;
+                }
             }
         ],
         createdRow: function( row, data, dataIndex ) {
@@ -96,7 +105,7 @@ script.
                     const checked = data? 'checked': '';
                     return `
                     <input type="checkbox" 
-                        class="porteo" ${checked}/>`;
+                        class="porteoEdicion" ${checked}/>`;
                 }
             }
         ],

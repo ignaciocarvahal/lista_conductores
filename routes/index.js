@@ -26,8 +26,8 @@ module.exports = function(){
         listaIngresoConductoresController.agregarConductorEnListaIngreso
     );
 
-    router.post('/mantenedor/cambios',
-        listaIngresoConductoresController.guardarCambiosMantenedor
+    router.post('/conductores/change',
+        listaIngresoConductoresController.guardarCambiosConductor
     );
 
     return router;

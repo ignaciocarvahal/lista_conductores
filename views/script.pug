@@ -56,9 +56,7 @@ script.
             }
         ],
         createdRow: function( row, data, dataIndex ) {
-            if (data['por_eliminar'] === true) {
-                $(row).addClass('strikeout');
-            }
+            $(row).addClass('strikeout');
         }
     }
 
@@ -110,7 +108,7 @@ script.
             }
         ],
         createdRow: function( row, data, dataIndex ) {
-            if (data['n_presentaciones_hoy'] > 0) {
+            if (data['estado_lista_carga'] == 1) {
                 $(row).addClass('bg-success text-white');
             }
         }

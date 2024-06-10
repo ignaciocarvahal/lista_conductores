@@ -94,6 +94,7 @@ exports.cargarRankings = async (req, res) => {
     dataPorEliminar = RankingPorEliminar;
 
     let rutArray = [];
+    let cambiosListaCargaArray = [];
 
     rankingsArray.forEach((rankingData) => {
         for (let fila of rankingData) { rutArray.push(fila.usu_rut) }
@@ -153,11 +154,35 @@ exports.cargarRankings = async (req, res) => {
             type: QueryTypes.SELECT
         });
 
-        function presentacionesRetirosHelper(dataArray) {
+        let ListaDeCarga = await db.query(`
+        SELECT DISTINCT ON (usu.usu_rut)
+            usu.usu_rut AS rut
+
+            FROM public.servicios AS ser
+            INNER JOIN public.listado_carga_contenedores AS carga on ser.numero_contenedor=carga.contenedor AND ser.id=carga.fk_servicio AND carga.estado IS true
+            LEFT JOIN public.servicios_etapas AS eta_2 on ser.id=eta_2.fk_servicio AND eta_2.tipo=2
+            LEFT JOIN public.servicios_etapas_conductores AS cond ON eta_2.id=cond.fk_etapa
+            LEFT JOIN public.usuarios AS usu ON cond.fk_conductor=usu.usu_rut
+            WHERE usu.usu_rut NOT IN (:ruts)
+            ORDER BY usu.usu_rut, carga.posicion ASC
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
+
+        function procesamientoHelper(dataArray) {
             // primero revisamos que no es lista vacia o indefinida
-            if (typeof dataArray !== 'undefined' && dataArray.length > 0) {    
+            if (typeof dataArray !== 'undefined' && dataArray.length > 0) {  
+                // guardamos los elementos que eliminaremos despues de iterar  
+                let eliminarArray = [];
+
                 for (let fila of dataArray) {
                     let rut = fila.usu_rut;
+
+                    // n presentaciones y retiros
                     for (let filaN of PresentacionesRetiros) {
                         if (rut === filaN.rut) {
                             fila['n_retiros_mes'] = filaN.n_retiros_mes;
@@ -172,14 +197,77 @@ exports.cargarRankings = async (req, res) => {
                         fila['n_retiros_hoy'] = 0;
                         fila['n_presentaciones_hoy'] = 0;
                     }
+
+                    let en_lista = false;
+                    let cambio_estado = false;
+                    // estado lista de carga
+                    for (let conductorListaCarga of ListaDeCarga) {
+                        if (rut === conductorListaCarga.rut) {
+                            console.log("EN LISTA:", rut);
+                            en_lista = true;
+                            if (fila['estado_lista_carga'] == 0) {
+                                cambio_estado = true;
+                                fila['estado_lista_carga'] = 1;
+                            }
+                        }
+                    }
+
+                    // estado_lista_carga:
+                    //  0 = no ha estado en lista carga
+                    //  1 = esta actualmente en lista carga
+                    //  2 = estuvo en lista carga y ya se cargó el contenedor
+                    // al pasar a 2 ya no debería aparecer en ranking
+
+                    // si no aparecio en la lista cuando su estado era 1
+                    // pasa a 2
+                    if (!en_lista && fila['estado_lista_carga'] == 1) {
+                        fila['estado_lista_carga'] = 2;
+                        cambio_estado = true;
+                    }
+
+                    if (cambio_estado) {
+                        console.log("CAMBIO ESTADO");
+                        cambiosListaCargaArray.push(fila);
+                        //ademas eliminar del arreglo (para estado 2), para que no se muestre en la tabla.
+                        if(fila['estado_lista_carga'] == 2) {
+                            fila.por_eliminar = true;
+                            eliminarArray.push(fila);
+                        }
+                    }
+                }
+
+                for (let filaEliminacion of eliminarArray) {
+                    const index = dataArray.indexOf(filaEliminacion);
+                    if (index !== -1) {
+                        dataArray.splice(index, 1);
+                    }
+                    dataPorEliminar.push(filaEliminacion);
                 }
             }
         }
 
         rankingsArray.forEach((rankingData) => {
-            presentacionesRetirosHelper(rankingData)
+            procesamientoHelper(rankingData);
         });
+    }
 
+    console.log("------------------------AQUI DEBERIA OCURRIR UPDATE------------------------");
+    console.log(cambiosListaCargaArray);
+    for (let fila of cambiosListaCargaArray) {
+
+        await db.n_virginia.query(`
+        UPDATE mantenedor_ingreso_conductores
+            SET estado_lista_carga = :estado_lista_carga, por_eliminar = :por_eliminar
+            WHERE id = :id
+        `,
+        {
+            replacements: {
+                estado_lista_carga: fila.estado_lista_carga,
+                por_eliminar: (fila.estado_lista_carga == 2),
+                id: fila.id
+            },
+            type: QueryTypes.UPDATE
+        });
     }
 
     res.json({

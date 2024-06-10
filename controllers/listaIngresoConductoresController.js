@@ -277,6 +277,27 @@ exports.cargarRankings = async (req, res) => {
     });
 };
 
+exports.cargarRazonesEliminacion = async (req, res) => {
+    console.log("--------------------CARGANDO RAZONES ELIMINACION------------------------");
+    let RazonesEliminacion = await db.n_virginia.query(`
+        SELECT id, razon FROM razones_eliminacion
+    `,
+    {
+        type: QueryTypes.SELECT
+    });
+
+    console.log(RazonesEliminacion);
+
+    let razonesResponse = {};
+    // TODO: formatear datos en objeto con llaves = valor opcion y valor = texto opcion
+    // TODO: caso largo = 0
+    for(let fila of RazonesEliminacion) {
+        razonesResponse[fila.id] = fila.razon;
+    }
+    console.log(razonesResponse);
+    res.json(razonesResponse);
+}
+
 exports.guardarCambiosConductor = async (req, res) => {
     console.log("INICIANDIO GUARDADO CAMBIOS CONDUCTOR");
     let reordenadosArray = req.body['reordenados'];
@@ -306,12 +327,13 @@ exports.guardarCambiosConductor = async (req, res) => {
             console.log(dataMarcadoEliminacion);
             await db.n_virginia.query(`
                 UPDATE mantenedor_ingreso_conductores
-                    SET por_eliminar = :por_eliminar
+                    SET por_eliminar = :por_eliminar, fk_razon_eliminacion = :fk_razon_eliminacion
                     WHERE fk_ingreso = :fk_ingreso;   
             `,
             {
                 replacements: {
                     fk_ingreso: parseInt(dataMarcadoEliminacion['id']),
+                    fk_razon_eliminacion: dataMarcadoEliminacion['fk_razon_eliminacion'],
                     por_eliminar: dataMarcadoEliminacion['por_eliminar'],
                 },
                 type: QueryTypes.UPDATE

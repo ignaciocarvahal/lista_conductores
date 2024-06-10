@@ -116,6 +116,7 @@ script.
 
     var eliminados = [];
     var conductoresObj = {};
+    var razonesEliminacion = {};
     var canEdit = false;
     var saveState;
 
@@ -379,8 +380,11 @@ script.
         let willDelete = rowData.por_eliminar;
         if (!willDelete) {
             Swal.fire({
-                title: 'Confirmar',
-                text: '¿Desea marcar esta fila para eliminación?',
+                title: 'Razón',
+                text: 'Indique razón para eliminar',
+                input: 'select',
+                inputOptions: razonesEliminacion,
+                inputValue: 1,
                 showCancelButton: true,
             }).then(result => {
                 if (result.isConfirmed) {
@@ -388,7 +392,9 @@ script.
                     button.toggleClass('btn-warning btn-danger');
                     row.toggleClass('strikeout');
                     rowData.por_eliminar = !willDelete;
+                    rowData.fk_razon_eliminacion = result.value;
                     eliminados.push(rowData);
+                    console.log(result);
                     /*
                     console.log("iniciar proceso de eliminacion");
                     eliminados.push(rowData);
@@ -445,6 +451,24 @@ script.
         }
     }
 
+    function getRazonesEliminacion() {
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: '/razones_eliminacion',
+                method: 'GET',
+                data: {},
+                success: function(response) {
+                    resolve(response);
+                },
+                error: function(xhr, status, error) {
+                    // Handle error
+                    console.error('Error obteniendo razones eliminacion', error);
+                    reject(error);
+                }
+            });
+        });
+    }
+
     function getConductores() {
         return new Promise((resolve, reject) => {
             $.ajax({
@@ -492,6 +516,11 @@ script.
             $('#conductorText').prop('disabled', false);
             $('#porteador').prop('disabled', false);
             $('#submit').prop('disabled', false);
+        });
+
+        getRazonesEliminacion().then(data => {
+            console.log(data);
+            razonesEliminacion = data;
         });
 
         initializeTables();

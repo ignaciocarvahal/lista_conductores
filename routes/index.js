@@ -22,6 +22,10 @@ module.exports = function(){
         listaIngresoConductoresController.cargarRankings
     );
 
+    router.get('/razones_eliminacion',
+        listaIngresoConductoresController.cargarRazonesEliminacion
+    );
+
     router.post('/conductores/add',
         listaIngresoConductoresController.agregarConductorEnListaIngreso
     );

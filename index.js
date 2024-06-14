@@ -1,8 +1,8 @@
-const exp = require('constants');
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const routes = require('./routes');
+const listaIngresoConductoresController = require ('./controllers/listaIngresoConductoresController');
 
 const app = express();
 const PORT = 3000;
@@ -38,6 +38,9 @@ app.use(express.static('public'));
 
 // Define a route to render the index page
 app.use('/', routes());
+
+// m * s * ms
+setInterval(listaIngresoConductoresController.consultarListaCarga, 5 * 60 * 1000);
 
 // Start the server
 app.listen(PORT, () => {

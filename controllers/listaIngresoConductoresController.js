@@ -163,7 +163,7 @@ exports.cargarRankings = async (req, res) => {
             LEFT JOIN public.servicios_etapas AS eta_2 on ser.id=eta_2.fk_servicio AND eta_2.tipo=2
             LEFT JOIN public.servicios_etapas_conductores AS cond ON eta_2.id=cond.fk_etapa
             LEFT JOIN public.usuarios AS usu ON cond.fk_conductor=usu.usu_rut
-            WHERE usu.usu_rut NOT IN (:ruts)
+            WHERE usu.usu_rut IN (:ruts)
             ORDER BY usu.usu_rut, carga.posicion ASC
         `,
         {
@@ -366,6 +366,102 @@ exports.guardarCambiosConductor = async (req, res) => {
 
     // TODO: response en caso de error
     res.json({ response: 'success' });
+};
+
+exports.consultarListaCarga = async function() {
+    console.log("CONSULTA LISTA DE CARGA");
+
+    let RankingPropios = await db.n_virginia.query(`
+    SELECT * FROM ranking_ingreso_conductores_propios;
+    `, {
+        type: QueryTypes.SELECT
+    });
+
+    let RankingAsociados = await db.n_virginia.query(`
+    SELECT * FROM ranking_ingreso_conductores_asociados;
+    `, {
+        type: QueryTypes.SELECT
+    });
+
+    rankingsArray = [RankingPropios, RankingAsociados];
+
+    let rutArray = [];
+    let cambiosListaCargaArray = [];
+
+    rankingsArray.forEach((rankingData) => {
+        for (let fila of rankingData) { rutArray.push(fila.usu_rut) }
+    });
+
+    if (rutArray.length > 0) {
+        let ListaDeCarga = await db.query(`
+        SELECT DISTINCT ON (usu.usu_rut)
+            usu.usu_rut AS rut
+
+            FROM public.servicios AS ser
+            INNER JOIN public.listado_carga_contenedores AS carga on ser.numero_contenedor=carga.contenedor AND ser.id=carga.fk_servicio AND carga.estado IS true
+            LEFT JOIN public.servicios_etapas AS eta_2 on ser.id=eta_2.fk_servicio AND eta_2.tipo=2
+            LEFT JOIN public.servicios_etapas_conductores AS cond ON eta_2.id=cond.fk_etapa
+            LEFT JOIN public.usuarios AS usu ON cond.fk_conductor=usu.usu_rut
+            WHERE usu.usu_rut IN (:ruts)
+            ORDER BY usu.usu_rut, carga.posicion ASC
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
+
+        function procesamientoHelper(dataArray) {
+            // primero revisamos que no es lista vacia o indefinida
+            if (typeof dataArray !== 'undefined' && dataArray.length > 0) {  
+                for (let fila of dataArray) {
+                    let rut = fila.usu_rut;
+                    let en_lista = false;
+                    let cambio_estado = false;
+                    // estado lista de carga
+                    for (let conductorListaCarga of ListaDeCarga) {
+                        if (rut === conductorListaCarga.rut) {
+                            en_lista = true;
+                            if (fila['estado_lista_carga'] == 0) {
+                                cambio_estado = true;
+                                fila['estado_lista_carga'] = 1;
+                            }
+                        }
+                    }
+                    
+                    if (!en_lista && fila['estado_lista_carga'] == 1) {
+                        fila['estado_lista_carga'] = 2;
+                        cambio_estado = true;
+                    }
+
+                    if (cambio_estado) {
+                        cambiosListaCargaArray.push(fila);
+                    }
+                }
+            }
+        }
+
+        rankingsArray.forEach((rankingData) => {
+            procesamientoHelper(rankingData);
+        });
+    }
+
+    for (let fila of cambiosListaCargaArray) {
+        await db.n_virginia.query(`
+        UPDATE mantenedor_ingreso_conductores
+            SET estado_lista_carga = :estado_lista_carga, por_eliminar = :por_eliminar
+            WHERE id = :id
+        `,
+        {
+            replacements: {
+                estado_lista_carga: fila.estado_lista_carga,
+                por_eliminar: (fila.estado_lista_carga == 2),
+                id: fila.id
+            },
+            type: QueryTypes.UPDATE
+        });
+    }
 };
 
 exports.home = async (req, res) => {

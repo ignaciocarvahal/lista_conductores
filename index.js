@@ -40,7 +40,7 @@ app.use(express.static('public'));
 app.use('/', routes());
 
 // m * s * ms
-setInterval(listaIngresoConductoresController.consultarListaCarga, 5 * 60 * 1000);
+setInterval(listaIngresoConductoresController.consultarListaCarga, 2 * 60 * 1000);
 
 // Start the server
 app.listen(PORT, () => {

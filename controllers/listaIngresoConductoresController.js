@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { QueryTypes } = require('sequelize');
+const moment = require('moment');
 
 exports.cargarConductores = async (req, res) => {
     let Conductores = await db.query(`
@@ -20,9 +21,12 @@ exports.cargarConductores = async (req, res) => {
                 END
         ) as nombre, 
         usu.ult_empt_tipo AS tipo FROM usuarios usu WHERE usu.usu_tipo = 2 AND usu.usu_estado = 0;
-    `);
+    `,
+    {
+        type: QueryTypes.SELECT
+    });
 
-    res.json(Conductores[0]);
+    res.json(Conductores);
 };
 
 exports.agregarConductorEnListaIngreso = async (req, res) => {
@@ -68,6 +72,28 @@ exports.agregarConductorEnListaIngreso = async (req, res) => {
 };
 
 exports.cargarRankings = async (req, res) => {
+    let horaTopus = await db.query(`
+        SELECT CURRENT_TIMESTAMP AS tiempo;
+    `,
+    {
+        type: QueryTypes.SELECT
+    })
+
+    let horaNVirginia = await db.n_virginia.query(`
+        SELECT CURRENT_TIMESTAMP AS tiempo;
+    `,
+    {
+        type: QueryTypes.SELECT
+    })
+
+    horaTopus = moment(JSON.parse(JSON.stringify(horaTopus[0])).tiempo);
+    horaNVirginia = moment(JSON.parse(JSON.stringify(horaNVirginia[0])).tiempo);
+
+    // Si el momento que se recibe de argumento en .diff es mayor, retorna negativo.
+    // Es decir, si horasDiff es positivo significa que horaTopus es mayor por x horas.
+    // si es negativo, significa que horaTopus es menor por x horas.
+    let horasDiff = horaTopus.diff(horaNVirginia, 'hours');
+
     console.log("CARGAR LISTA INGRESO CONDUCTORES!");
 
     let RankingPropios = await db.n_virginia.query(`
@@ -76,11 +102,15 @@ exports.cargarRankings = async (req, res) => {
         type: QueryTypes.SELECT
     });
 
+    RankingPropios = JSON.parse(JSON.stringify(RankingPropios));
+
     let RankingAsociados = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_asociados;
     `, {
         type: QueryTypes.SELECT
     });
+
+    RankingAsociados = JSON.parse(JSON.stringify(RankingAsociados));
 
     let RankingPorEliminar = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_por_eliminar;
@@ -88,10 +118,14 @@ exports.cargarRankings = async (req, res) => {
         type: QueryTypes.SELECT
     });
 
+    RankingPorEliminar = JSON.parse(JSON.stringify(RankingPorEliminar));
+
     rankingsArray = [RankingPropios, RankingAsociados, RankingPorEliminar];
     dataPropios = RankingPropios;
     dataAsociados = RankingAsociados;
     dataPorEliminar = RankingPorEliminar;
+
+    console.log(dataPropios);
 
     let rutArray = [];
     let cambiosListaCargaArray = [];
@@ -154,6 +188,27 @@ exports.cargarRankings = async (req, res) => {
             type: QueryTypes.SELECT
         });
 
+        let EtapasRecientes = await db.query(`
+        WITH filas_ordenadas AS (
+            SELECT "createdAt", "updatedAt", fk_conductor,
+                   ROW_NUMBER() OVER (PARTITION BY fk_conductor ORDER BY "createdAt" DESC, "updatedAt" DESC) AS n_fila
+                FROM public.servicios_etapas_conductores
+                WHERE fk_conductor IN (:ruts)
+        )
+        SELECT "createdAt", "updatedAt", fk_conductor
+            FROM filas_ordenadas
+            WHERE n_fila = 1
+            ORDER BY "createdAt" DESC, "updatedAt" DESC;
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
+
+        EtapasRecientes = JSON.parse(JSON.stringify(EtapasRecientes));
+
         let ListaDeCarga = await db.query(`
         SELECT DISTINCT ON (usu.usu_rut)
             usu.usu_rut AS rut
@@ -212,6 +267,27 @@ exports.cargarRankings = async (req, res) => {
                         }
                     }
 
+                    // Comparamos los timestamps (ya sea createdAt o updatedAt) de la etapa más reciente con el horario de ingreso a la lista de conductores
+                    for (let datosEtapa of EtapasRecientes) {
+                        console.log("datosEtapa:", datosEtapa.fk_conductor);
+                        if (rut === datosEtapa.fk_conductor) {
+                            let timestampEtapa = moment(datosEtapa.createdAt);
+                            let timestampListaIngreso = moment(fila.createdAt).add(horasDiff, 'hours');
+                            console.log("TIMESTAMP ETAPA MAS RECIENTE:", moment(fila.createdAt));
+                            console.log("TIMESTAMP INGRESO (N_VIRGINIA + DIFF):", moment(fila.createdAt).add(horasDiff, 'hours'));
+
+                            // Si la etapa es más reciente que el horario de ingreso, lo sacamos de la lista de conductores.
+                            if (timestampListaIngreso < timestampEtapa) {
+                                console.log("Etapa es más reciente que el horario de ingreso, lo sacamos de la lista de conductores");
+                                fila.por_eliminar = true;
+                                cambiosListaCargaArray.push(fila);
+                                eliminarArray.push(fila);
+                            } else {
+                                console.log("ingreso es mayor o igual, no hacemos nada");
+                            }
+                        }
+                    }
+
                     // estado_lista_carga:
                     //  0 = no ha estado en lista carga
                     //  1 = esta actualmente en lista carga
@@ -251,10 +327,7 @@ exports.cargarRankings = async (req, res) => {
         });
     }
 
-    console.log("------------------------AQUI DEBERIA OCURRIR UPDATE------------------------");
-    console.log(cambiosListaCargaArray);
     for (let fila of cambiosListaCargaArray) {
-
         await db.n_virginia.query(`
         UPDATE mantenedor_ingreso_conductores
             SET estado_lista_carga = :estado_lista_carga, por_eliminar = :por_eliminar
@@ -263,7 +336,7 @@ exports.cargarRankings = async (req, res) => {
         {
             replacements: {
                 estado_lista_carga: fila.estado_lista_carga,
-                por_eliminar: (fila.estado_lista_carga == 2),
+                por_eliminar: (fila.estado_lista_carga == 2) || (fila.por_eliminar),
                 id: fila.id
             },
             type: QueryTypes.UPDATE
@@ -278,7 +351,6 @@ exports.cargarRankings = async (req, res) => {
 };
 
 exports.cargarRazonesEliminacion = async (req, res) => {
-    console.log("--------------------CARGANDO RAZONES ELIMINACION------------------------");
     let RazonesEliminacion = await db.n_virginia.query(`
         SELECT id, razon FROM razones_eliminacion
     `,
@@ -286,10 +358,8 @@ exports.cargarRazonesEliminacion = async (req, res) => {
         type: QueryTypes.SELECT
     });
 
-    console.log(RazonesEliminacion);
-
     let razonesResponse = {};
-    // TODO: formatear datos en objeto con llaves = valor opcion y valor = texto opcion
+
     // TODO: caso largo = 0
     for(let fila of RazonesEliminacion) {
         razonesResponse[fila.id] = fila.razon;
@@ -371,11 +441,35 @@ exports.guardarCambiosConductor = async (req, res) => {
 exports.consultarListaCarga = async function() {
     console.log("CONSULTA LISTA DE CARGA");
 
+    let horaTopus = await db.query(`
+        SELECT CURRENT_TIMESTAMP AS tiempo;
+    `,
+    {
+        type: QueryTypes.SELECT
+    })
+
+    let horaNVirginia = await db.n_virginia.query(`
+        SELECT CURRENT_TIMESTAMP AS tiempo;
+    `,
+    {
+        type: QueryTypes.SELECT
+    })
+
+    horaTopus = moment(JSON.parse(JSON.stringify(horaTopus[0])).tiempo);
+    horaNVirginia = moment(JSON.parse(JSON.stringify(horaNVirginia[0])).tiempo);
+
+    // Si el momento que se recibe de argumento en .diff es mayor, retorna negativo.
+    // Es decir, si horasDiff es positivo significa que horaTopus es mayor por x horas.
+    // si es negativo, significa que horaTopus es menor por x horas.
+    let horasDiff = horaTopus.diff(horaNVirginia, 'hours');
+
     let RankingPropios = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_propios;
     `, {
         type: QueryTypes.SELECT
     });
+
+    RankingPropios = JSON.parse(JSON.stringify(RankingPropios));
 
     let RankingAsociados = await db.n_virginia.query(`
     SELECT * FROM ranking_ingreso_conductores_asociados;
@@ -383,16 +477,48 @@ exports.consultarListaCarga = async function() {
         type: QueryTypes.SELECT
     });
 
+    RankingAsociados = JSON.parse(JSON.stringify(RankingAsociados));
+
+    console.log(RankingPropios);
+    console.log(RankingAsociados);
+
     rankingsArray = [RankingPropios, RankingAsociados];
 
     let rutArray = [];
     let cambiosListaCargaArray = [];
+    let eliminarArray = [];
 
     rankingsArray.forEach((rankingData) => {
         for (let fila of rankingData) { rutArray.push(fila.usu_rut) }
     });
 
     if (rutArray.length > 0) {
+        console.log("RUTS:", rutArray);
+
+        // Consultar a la tabla servicios_etapas_conductores de topus, donde aparecen las etapas asignadas a ciertos conductores (filtramos por los ruts)
+        let EtapasRecientes = await db.query(`
+        WITH filas_ordenadas AS (
+            SELECT "createdAt", "updatedAt", fk_conductor,
+                   ROW_NUMBER() OVER (PARTITION BY fk_conductor ORDER BY "createdAt" DESC, "updatedAt" DESC) AS n_fila
+                FROM public.servicios_etapas_conductores
+                WHERE fk_conductor IN (:ruts)
+        )
+        SELECT "createdAt", "updatedAt", fk_conductor
+            FROM filas_ordenadas
+            WHERE n_fila = 1
+            ORDER BY "createdAt" DESC, "updatedAt" DESC;
+        `,
+        {
+            replacements: {
+                ruts: rutArray
+            },
+            type: QueryTypes.SELECT
+        });
+
+        EtapasRecientes = JSON.parse(JSON.stringify(EtapasRecientes));
+
+        console.log(EtapasRecientes);
+
         let ListaDeCarga = await db.query(`
         SELECT DISTINCT ON (usu.usu_rut)
             usu.usu_rut AS rut
@@ -419,6 +545,25 @@ exports.consultarListaCarga = async function() {
                     let rut = fila.usu_rut;
                     let en_lista = false;
                     let cambio_estado = false;
+
+                    // Comparamos los timestamps (ya sea createdAt o updatedAt) de la etapa más reciente con el horario de ingreso a la lista de conductores
+                    for (let datosEtapa of EtapasRecientes) {
+                        console.log("datosEtapa:", datosEtapa.fk_conductor);
+                        if (rut === datosEtapa.fk_conductor) {
+                            let timestampEtapa = moment(datosEtapa.createdAt);
+                            let timestampListaIngreso = moment(fila.createdAt).add(horasDiff, 'hours');
+                            console.log("TIMESTAMP ETAPA MAS RECIENTE:", timestampEtapa);
+                            console.log("TIMESTAMP INGRESO (N_VIRGINIA + DIFF):", timestampListaIngreso);
+
+                            // Si la etapa es más reciente que el horario de ingreso, lo sacamos de la lista de conductores.
+                            if (timestampListaIngreso < timestampEtapa) {
+                                console.log("Etapa es más reciente que el horario de ingreso, lo sacamos de la lista de conductores");
+                                eliminarArray.push(fila);
+                            } else {
+                                console.log("ingreso es mayor o igual, no hacemos nada");
+                            }
+                        }
+                    }
                     // estado lista de carga
                     for (let conductorListaCarga of ListaDeCarga) {
                         if (rut === conductorListaCarga.rut) {
@@ -429,7 +574,7 @@ exports.consultarListaCarga = async function() {
                             }
                         }
                     }
-                    
+
                     if (!en_lista && fila['estado_lista_carga'] == 1) {
                         fila['estado_lista_carga'] = 2;
                         cambio_estado = true;
@@ -461,6 +606,20 @@ exports.consultarListaCarga = async function() {
             },
             type: QueryTypes.UPDATE
         });
+    }
+
+    for (let fila of eliminarArray) {
+        await db.n_virginia.query(`
+        UPDATE mantenedor_ingreso_conductores
+            SET por_eliminar = TRUE
+            WHERE id = :id
+        `,
+        {
+            replacements: {
+                id: fila.id
+            },
+            type: QueryTypes.UPDATE
+        }); 
     }
 };
 
